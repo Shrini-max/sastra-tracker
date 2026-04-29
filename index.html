@@ -827,6 +827,7 @@ function renderDash() {
               <td>
                 <div style="display:flex;gap:6px">
                   <button class="btn bs bsm" onclick="expandSem('${s.id}')">↕</button>
+                  <button class="btn bs bsm" onclick="loadSemForEdit('${s.id}')">✎</button>
                   <button class="btn bd bsm" onclick="delSem('${s.id}')">×</button>
                 </div>
               </td>
@@ -1206,6 +1207,43 @@ function delTmplById(id) {
 // SEMESTER MANAGER
 // ════════════════════════════════════════════════════════════════════
 let courses = [];
+let editingSemId = null;
+
+function loadSemForEdit(id) {
+  const d = gd(), sem = d.semesters.find(s => s.id === id);
+  if (!sem) return;
+  editingSemId = id;
+  courses = sem.courses.map(c => ({...c}));
+  goTab('semester');
+  const sel = document.getElementById('sem-sel');
+  if (sel) sel.value = sem.name;
+  renderCourseList();
+  renderEditBanner();
+}
+
+function renderEditBanner() {
+  const existing = document.getElementById('edit-banner');
+  if (existing) existing.remove();
+  if (!editingSemId) return;
+  const d = gd(), sem = d.semesters.find(s => s.id === editingSemId);
+  if (!sem) return;
+  const banner = document.createElement('div');
+  banner.id = 'edit-banner';
+  banner.className = 'al aw';
+  banner.style.marginBottom = '14px';
+  banner.innerHTML = `✎ Editing <strong>${sem.name}</strong> — modify courses below, then click Save Semester.
+    <button class="btn bs bsm" style="margin-left:10px;vertical-align:middle" onclick="cancelEdit()">Cancel</button>`;
+  const semTab = document.getElementById('tab-semester');
+  semTab.insertBefore(banner, semTab.querySelector('.card'));
+}
+
+function cancelEdit() {
+  editingSemId = null;
+  courses = [];
+  renderCourseList();
+  const b = document.getElementById('edit-banner');
+  if (b) b.remove();
+}
 
 function toggleCM() {
   const m = document.getElementById('cm').value;
@@ -1282,10 +1320,18 @@ function renderCourseList() {
 function saveSem() {
   if (!courses.length) { toast('Add at least one course','err'); return; }
   const nm = document.getElementById('sem-sel').value;
-  const d  = gd(); d.semesters = d.semesters.filter(s => s.name !== nm);
-  d.semesters.push({id:Date.now().toString(), name:nm, courses:[...courses], sgpa:sgpa(courses), tc:courses.reduce((a,c)=>a+c.credits,0)});
+  const d  = gd();
+  const keepId = editingSemId || null;
+  d.semesters = d.semesters.filter(s => editingSemId ? s.id !== editingSemId : s.name !== nm);
+  d.semesters.push({id: keepId || Date.now().toString(), name:nm, courses:[...courses], sgpa:sgpa(courses), tc:courses.reduce((a,c)=>a+c.credits,0)});
   d.semesters.sort((a,b) => (parseInt(a.name.replace(/\D/g,''))||0) - (parseInt(b.name.replace(/\D/g,''))||0));
-  sd(d); courses=[]; renderCourseList(); toast(nm+' saved!');
+  sd(d);
+  editingSemId = null;
+  courses = [];
+  renderCourseList();
+  const b = document.getElementById('edit-banner');
+  if (b) b.remove();
+  toast(nm + ' saved!');
 }
 
 function clearSem() { courses=[]; renderCourseList(); }
