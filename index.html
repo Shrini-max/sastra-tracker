@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SASTRA Academic Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--sur:#1e293b;--sur2:#334155;--bor:#475569;
+  --pri:#6366f1;--pril:#818cf8;--txt:#f1f5f9;--mut:#94a3b8;
+  --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--r:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+
+header{background:var(--sur);padding:13px 22px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px}
+header h1{font-size:17px;font-weight:800}
+header small{color:var(--mut);font-size:11px}
+
+nav{display:flex;background:var(--sur);border-bottom:1px solid var(--bor);padding:0 18px;overflow-x:auto;gap:2px}
+nav button{padding:13px 15px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+nav button.on{color:var(--pril);border-bottom-color:var(--pri)}
+nav button:hover:not(.on){color:var(--txt)}
+
+main{padding:22px;max-width:960px;margin:0 auto}
+.tab{display:none}.tab.on{display:block}
+
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.ct{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+
+.sv{font-size:38px;font-weight:800;line-height:1}
+.sl{font-size:11px;color:var(--mut);margin-top:3px}
+
+.bdg{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.bg{background:#78350f;color:#fbbf24}.bb{background:#1e3a5f;color:#60a5fa}
+.bp{background:#3b0764;color:#c084fc}.bn{background:var(--sur2);color:var(--mut)}
+.bk{background:#14532d;color:#4ade80}.br{background:#7f1d1d;color:#f87171}
+
+.fg{margin-bottom:12px}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+input,select{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:8px 12px;color:var(--txt);font-size:13px;outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--pri)}
+input::placeholder{color:var(--bor)}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+
+.btn{padding:8px 16px;border-radius:7px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.bp2{background:var(--pri);color:#fff}.bp2:hover{background:#4f46e5}
+.bs{background:var(--sur2);color:var(--txt)}.bs:hover{background:var(--bor)}
+.bd{background:#7f1d1d;color:#f87171}.bd:hover{background:#991b1b}
+.bsm{padding:4px 9px;font-size:11px}
+.bfw{width:100%}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;padding:8px 9px;border-bottom:1px solid var(--bor)}
+td{padding:9px;border-bottom:1px solid var(--sur2);font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+.pbar{height:5px;background:var(--sur2);border-radius:999px;overflow:hidden;margin-top:5px}
+.pfill{height:100%;border-radius:999px;transition:width .5s ease}
+
+.al{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px}
+.ai{background:#1e3a5f;color:#93c5fd;border:1px solid #1d4ed8}
+.as{background:#14532d;color:#86efac;border:1px solid #16a34a}
+.aw{background:#78350f;color:#fcd34d;border:1px solid #d97706}
+.ae{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
+
+.div{height:1px;background:var(--bor);margin:16px 0}
+.st{font-size:17px;font-weight:700;margin-bottom:14px}
+.rbox{text-align:center;padding:24px;background:linear-gradient(135deg,var(--sur) 0%,#1a1f35 100%);border-radius:var(--r);border:1px solid var(--bor)}
+
+/* Internals entry box */
+.ebox{background:var(--sur2);border-radius:9px;padding:12px;border:1px solid transparent;transition:all .3s;position:relative}
+.ebox.counted{border-color:var(--ok)}
+.ebox.dropped{opacity:.45}
+.etag{position:absolute;top:6px;right:7px;font-size:9px;font-weight:700}
+.emarks{font-size:22px;font-weight:800;color:var(--pril);text-align:center;margin:6px 0 2px}
+
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:24px}
+.modal-bg.open{display:flex;align-items:flex-start;justify-content:center}
+.modal{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:24px;width:100%;max-width:680px;margin:auto}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;padding:11px 18px;font-size:13px;font-weight:600;z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+
+@media(max-width:620px){
+  .g2{grid-template-columns:1fr}.g3{grid-template-columns:1fr 1fr}.g4{grid-template-columns:1fr 1fr}
+  main{padding:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- Template Editor Modal -->
+<div class="modal-bg" id="tmpl-modal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h2 style="font-size:16px;font-weight:700" id="modal-title">New Subject Template</h2>
+      <button class="btn bs bsm" onclick="closeModal()">✕ Close</button>
+    </div>
+    <div id="tmpl-editor"></div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn bp2" onclick="saveTmpl()">Save Template</button>
+      <button class="btn bs" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>🎓 SASTRA Academic Tracker</h1>
+    <small>B.Tech ECE · 10-point scale · CIA 50 + End Sem 50</small>
+  </div>
+</header>
+
+<nav>
+  <button class="on" onclick="goTab(this,'dashboard')">Dashboard</button>
+  <button onclick="goTab(this,'internals')">Internals Calc</button>
+  <button onclick="goTab(this,'semester')">Add Semester</button>
+  <button onclick="goTab(this,'predictor')">CGPA Predictor</button>
+  <button onclick="goTab(this,'settings')">Settings</button>
+</nav>
+
+<main>
+
+<!-- DASHBOARD -->
+<div class="tab on" id="tab-dashboard"><div id="dash"></div></div>
+
+<!-- INTERNALS -->
+<div class="tab" id="tab-internals">
+  <div class="st">Internals Calculator</div>
+
+  <div class="card">
+    <div class="ct">Subject Template</div>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label>Select Template</label>
+        <select id="tmpl-sel" onchange="changeTmpl(this.value)"></select>
+      </div>
+      <button class="btn bp2" onclick="openNewTmpl()">+ New Template</button>
+      <button class="btn bs" id="edit-tmpl-btn" onclick="openEditTmpl()">Edit</button>
+      <button class="btn bd" id="del-tmpl-btn" onclick="delTmpl()">Delete</button>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--mut)" id="tmpl-desc"></div>
+  </div>
+
+  <div id="cia-inputs-area"></div>
+
+  <div class="card">
+    <div class="ct">End Semester</div>
+    <div style="max-width:280px">
+      <div class="fg">
+        <label>End Semester Marks (out of 50) — optional</label>
+        <input type="number" id="endsem" min="0" max="50" step=".5" placeholder="Leave blank to use predictor" oninput="computeCIA()">
+      </div>
+    </div>
+    <div id="int-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">What End Sem marks do I need?</div>
+    <div style="max-width:280px">
+      <div class="fg">
+        <label>Target Grade</label>
+        <select id="tgt-grade" onchange="computeEndNeed()">
+          <option value="10">S — Outstanding (≥ 91%)</option>
+          <option value="9">A+ — Excellent (86–90%)</option>
+          <option value="8">A — Very Good (75–85%)</option>
+          <option value="7">B — Good (66–74%)</option>
+          <option value="6">C — Satisfactory (55–65%)</option>
+          <option value="5" selected>D — Pass (50–54%)</option>
+        </select>
+      </div>
+    </div>
+    <div id="endsem-need"></div>
+  </div>
+</div>
+
+<!-- SEMESTER -->
+<div class="tab" id="tab-semester">
+  <div class="st">Semester Manager</div>
+  <div class="card">
+    <div class="g2">
+      <div class="fg">
+        <label>Semester</label>
+        <select id="sem-sel">
+          <option>Semester 1</option><option>Semester 2</option><option>Semester 3</option>
+          <option>Semester 4</option><option>Semester 5</option><option>Semester 6</option>
+          <option>Semester 7</option><option>Semester 8</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">Add Course</div>
+    <div class="g4">
+      <div class="fg" style="grid-column:span 2">
+        <label>Course Name</label>
+        <input type="text" id="cn" placeholder="e.g. Signals and Systems">
+      </div>
+      <div class="fg"><label>Credits</label><input type="number" id="cc" min="1" max="6" value="3"></div>
+      <div class="fg">
+        <label>Input as</label>
+        <select id="cm" onchange="toggleCM()">
+          <option value="marks">Total Marks (/100)</option>
+          <option value="grade">Grade directly</option>
+        </select>
+      </div>
+    </div>
+    <div id="cm-marks">
+      <div class="fg"><label>Total Marks (CIA + End Sem, out of 100)</label><input type="number" id="cmk" min="0" max="100" step=".5" placeholder="0–100" oninput="prevGrade()"></div>
+      <div id="gprev"></div>
+    </div>
+    <div id="cm-grade" style="display:none">
+      <div class="fg">
+        <label>Grade</label>
+        <select id="cgs">
+          <option value="10">S — 10 pts</option><option value="9">A+ — 9 pts</option>
+          <option value="8">A — 8 pts</option><option value="7">B — 7 pts</option>
+          <option value="6">C — 6 pts</option><option value="5">D — 5 pts</option>
+          <option value="0">F — 0 pts</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn bp2" onclick="addCourse()">+ Add Course</button>
+  </div>
+  <div class="card">
+    <div class="ct">Courses This Semester</div>
+    <div id="clist"></div>
+    <div class="div"></div>
+    <div id="sgpa-prev"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn bp2" onclick="saveSem()">Save Semester</button>
+      <button class="btn bs" onclick="clearSem()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- PREDICTOR -->
+<div class="tab" id="tab-predictor">
+  <div class="st">CGPA Predictor</div>
+  <p style="color:var(--mut);font-size:13px;margin-bottom:18px">Calculate what SGPA you need in remaining semesters to hit your target CGPA.</p>
+  <div class="g2">
+    <div class="card" style="margin-bottom:0"><div class="ct">Current Standing</div><div id="pred-cur"></div></div>
+    <div class="card" style="margin-bottom:0">
+      <div class="ct">Target</div>
+      <div class="fg"><label>Target CGPA</label><input type="number" id="tgt-cgpa" min="5" max="10" step=".1" value="7.5" oninput="computePred()"></div>
+      <div class="fg"><label>Approx credits per remaining semester</label><input type="number" id="cps" min="10" max="30" value="22" oninput="computePred()"></div>
+    </div>
+  </div>
+  <div style="margin-top:14px" id="pred-res"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="tab" id="tab-settings">
+  <div class="st">Profile &amp; Settings</div>
+  <div class="card">
+    <div class="ct">Your Profile</div>
+    <div class="g2">
+      <div class="fg"><label>Name</label><input type="text" id="pn" placeholder="Your name"></div>
+      <div class="fg"><label>Branch</label><input type="text" id="pb" placeholder="e.g. Electronics & Communication Engineering"></div>
+      <div class="fg"><label>Batch</label><input type="text" id="py" placeholder="e.g. 2023-2027"></div>
+      <div class="fg">
+        <label>Programme</label>
+        <select id="pp">
+          <option value="btech">B.Tech (8 semesters, 180 credits)</option>
+          <option value="mtech">M.Tech Integrated (10 semesters, 225 credits)</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn bp2" onclick="saveProfile()">Save Profile</button>
+  </div>
+  <div class="card">
+    <div class="ct">Subject Templates</div>
+    <div id="tmpl-list-settings"></div>
+  </div>
+  <div class="card">
+    <div class="ct">Data</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn bs" onclick="exportData()">Export JSON</button>
+      <button class="btn bs" onclick="document.getElementById('impf').click()">Import JSON</button>
+      <button class="btn bd" onclick="clearAll()">Clear All Data</button>
+    </div>
+    <input type="file" id="impf" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+  <div class="card">
+    <div class="ct">Grading Reference</div>
+    <table>
+      <thead><tr><th>Marks</th><th>Grade</th><th>Points</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>≥ 91%</td><td><span style="color:#a78bfa;font-weight:700">S</span></td><td>10</td><td>Outstanding</td></tr>
+        <tr><td>86–90%</td><td><span style="color:#60a5fa;font-weight:700">A+</span></td><td>9</td><td>Excellent</td></tr>
+        <tr><td>75–85%</td><td><span style="color:#34d399;font-weight:700">A</span></td><td>8</td><td>Very Good</td></tr>
+        <tr><td>66–74%</td><td><span style="color:#4ade80;font-weight:700">B</span></td><td>7</td><td>Good</td></tr>
+        <tr><td>55–65%</td><td><span style="color:#facc15;font-weight:700">C</span></td><td>6</td><td>Satisfactory</td></tr>
+        <tr><td>50–54%</td><td><span style="color:#fb923c;font-weight:700">D</span></td><td>5</td><td>Pass</td></tr>
+        <tr><td>&lt; 50%</td><td><span style="color:#f87171;font-weight:700">F</span></td><td>0</td><td>Fail</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+<script>
+// ── Grades ────────────────────────────────────────────────────────
+const GS=[
+  {min:91,g:'S', p:10,d:'Outstanding',  c:'#a78bfa'},
+  {min:86,g:'A+',p:9, d:'Excellent',    c:'#60a5fa'},
+  {min:75,g:'A', p:8, d:'Very Good',    c:'#34d399'},
+  {min:66,g:'B', p:7, d:'Good',         c:'#4ade80'},
+  {min:55,g:'C', p:6, d:'Satisfactory', c:'#facc15'},
+  {min:50,g:'D', p:5, d:'Pass',         c:'#fb923c'},
+  {min:0, g:'F', p:0, d:'Fail',         c:'#f87171'},
+];
+const gfm = m => GS.find(x=>m>=x.min)||GS[GS.length-1];
+const gfp = p => GS.find(x=>x.p===p)||GS[GS.length-1];
+const cc  = v => v>=8.5?'#a78bfa':v>=7.5?'#60a5fa':v>=6.5?'#34d399':v>=6?'#facc15':v>=5?'#fb923c':'#f87171';
+
+function classify(cgpa,arr){
+  if(cgpa>=7.5&&!arr)return{l:'First Class with Distinction',b:'bg'};
+  if(cgpa>=6)return{l:'First Class',b:'bb'};
+  if(cgpa>=5)return{l:'Second Class',b:'bp'};
+  return{l:'Pass',b:'bn'};
+}
+
+// ── Data ──────────────────────────────────────────────────────────
+const KEY='sastra_v2';
+const mk=()=>({profile:{name:'',branch:'Electronics & Communication Engineering',batch:'',programme:'btech'},semesters:[],templates:null});
+const gd=()=>{try{return JSON.parse(localStorage.getItem(KEY))||mk()}catch{return mk()}};
+const sd=d=>localStorage.setItem(KEY,JSON.stringify(d));
+
+// ── Default Templates ─────────────────────────────────────────────
+const DEFTMPLS=[
+  {
+    id:'tmpl_theory',name:'Theory (Standard)',isDefault:true,
+    components:[
+      {id:'tc1',name:'CAT Tests',ciaMarks:40,bestOf:2,
+       entries:[{label:'CAT 1',max:50},{label:'CAT 2',max:50},{label:'CAT 3 / Model',max:100}]},
+      {id:'tc2',name:'Assignment / Quiz / Seminar',ciaMarks:10,bestOf:null,
+       entries:[{label:'Assignment',max:10}]}
+    ]
+  },
+  {
+    id:'tmpl_lab',name:'Lab (Standard)',isDefault:true,
+    components:[
+      {id:'lc1',name:'Experimental Work & Observations',ciaMarks:40,bestOf:null,
+       entries:[{label:'Lab Marks',max:50}]},
+      {id:'lc2',name:'Viva-Voce',ciaMarks:10,bestOf:null,
+       entries:[{label:'Viva',max:10}]}
+    ]
+  },
+  {
+    id:'tmpl_tl',name:'Theory + Lab (Combined)',isDefault:true,
+    components:[
+      {id:'tlc1',name:'Theory Tests',ciaMarks:25,bestOf:1,
+       entries:[{label:'CAT 1',max:50},{label:'CAT 2',max:50}]},
+      {id:'tlc2',name:'Lab Work',ciaMarks:15,bestOf:null,
+       entries:[{label:'Lab Marks',max:50}]},
+      {id:'tlc3',name:'Assignment / Viva',ciaMarks:10,bestOf:null,
+       entries:[{label:'Assignment / Viva',max:10}]}
+    ]
+  }
+];
+
+function getTmpls(){
+  const d=gd();
+  if(!d.templates||d.templates.length===0){d.templates=DEFTMPLS;sd(d)}
+  return d.templates;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.borderColor=type==='err'?'var(--err)':type==='warn'?'var(--warn)':'var(--ok)';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+// ── GPA Calc ──────────────────────────────────────────────────────
+const sgpa=cs=>{const sC=cs.reduce((a,c)=>a+c.credits,0);return sC>0?cs.reduce((a,c)=>a+c.credits*c.pt,0)/sC:0};
+const cgpa=ss=>{const sN=ss.reduce((a,s)=>a+s.tc,0);return sN>0?ss.reduce((a,s)=>a+s.sgpa*s.tc,0)/sN:0};
+
+// ── Tab navigation ────────────────────────────────────────────────
+function goTab(btn,name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  btn.classList.add('on');
+  if(name==='dashboard')renderDash();
+  if(name==='internals')renderInternals();
+  if(name==='predictor')renderPred();
+  if(name==='settings'){loadProfile();renderTmplSettings()}
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════════
+let gChart=null;
+function renderDash(){
+  const d=gd(),ss=d.semesters,cg=cgpa(ss);
+  const tc=ss.reduce((a,s)=>a+s.tc,0),hasArr=ss.some(s=>s.courses.some(c=>c.pt===0));
+  const prog=d.profile.programme==='mtech'?225:180,tsems=d.profile.programme==='mtech'?10:8;
+  const last=ss[ss.length-1],cls=classify(cg,hasArr),name=d.profile.name||'Student';
+  const runCG=ss.map((_,i)=>+cgpa(ss.slice(0,i+1)).toFixed(2));
+
+  if(!ss.length){
+    document.getElementById('dash').innerHTML=`
+      <div class="al ai">👋 Welcome, <strong>${name}</strong>! Add your semester data in the <strong>Add Semester</strong> tab to get started.</div>
+      <div class="card" style="text-align:center;padding:44px">
+        <div style="font-size:48px;margin-bottom:14px">📚</div>
+        <div style="font-size:17px;font-weight:700;margin-bottom:6px">No data yet</div>
+        <p style="color:var(--mut);font-size:13px">Enter your grades to see CGPA, trends, and predictions.</p>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('dash').innerHTML=`
+    <div class="g2" style="margin-bottom:14px">
+      <div class="rbox">
+        <div style="font-size:11px;color:var(--mut);margin-bottom:7px;letter-spacing:.05em">CUMULATIVE GPA</div>
+        <div style="font-size:58px;font-weight:800;color:${cc(cg)};line-height:1">${cg.toFixed(2)}</div>
+        <div style="margin-top:12px"><span class="bdg ${cls.b}">${cls.l}</span></div>
+        ${hasArr?'<div style="font-size:11px;color:var(--err);margin-top:7px">⚠ History of arrears</div>':''}
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="ct">Quick Stats</div>
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:13px">
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--mut)">Last SGPA (${last.name})</span>
+            <span style="font-weight:700;color:${cc(last.sgpa)}">${last.sgpa.toFixed(2)}</span>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="color:var(--mut)">Credits Earned</span>
+              <span style="font-weight:700">${tc} / ${prog}</span>
+            </div>
+            <div class="pbar"><div class="pfill" style="width:${Math.min(tc/prog*100,100).toFixed(1)}%;background:var(--pri)"></div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--mut)">Semesters Done</span>
+            <span style="font-weight:700">${ss.length} / ${tsems}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--mut)">Distinction Eligible</span>
+            <span style="font-weight:700;color:${cg>=7.5&&!hasArr?'var(--ok)':'var(--err)'}">
+              ${cg>=7.5&&!hasArr?'✓ Yes':cg>=7.5?'✗ Arrears':'✗ CGPA < 7.5'}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--mut)">Honours / ACRS</span>
+            <span style="font-weight:700;color:${cg>=7.5&&!hasArr?'var(--ok)':'var(--err)'}">
+              ${cg>=7.5&&!hasArr?'✓ Eligible':'✗ Not yet'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">GPA Trend</div>
+      <canvas id="gc" height="85"></canvas>
+    </div>
+    <div class="card">
+      <div class="ct">Semester History</div>
+      <table>
+        <thead><tr><th>Semester</th><th>Courses</th><th>Credits</th><th>SGPA</th><th>CGPA</th><th></th></tr></thead>
+        <tbody>
+          ${ss.map((s,i)=>`
+            <tr>
+              <td>${s.name}</td><td>${s.courses.length}</td><td>${s.tc}</td>
+              <td><span style="font-weight:700;color:${cc(s.sgpa)}">${s.sgpa.toFixed(2)}</span></td>
+              <td><span style="font-weight:700">${runCG[i].toFixed(2)}</span></td>
+              <td style="display:flex;gap:6px">
+                <button class="btn bs bsm" onclick="expandSem('${s.id}')">↕</button>
+                <button class="btn bd bsm" onclick="delSem('${s.id}')">×</button>
+              </td>
+            </tr>
+            <tr id="sx-${s.id}" style="display:none">
+              <td colspan="6" style="background:var(--bg);padding:0">
+                <div style="padding:10px">
+                  <table>
+                    <thead><tr><th>Course</th><th>Credits</th><th>Grade</th><th>Pts</th><th>Marks</th></tr></thead>
+                    <tbody>${s.courses.map(c=>{const g=gfp(c.pt);return`<tr>
+                      <td>${c.name}</td><td>${c.credits}</td>
+                      <td><span style="color:${g.c};font-weight:700">${c.grade}</span></td>
+                      <td>${c.pt}</td><td>${c.marks!=null?c.marks+'/100':'—'}</td>
+                    </tr>`}).join('')}</tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  if(gChart){gChart.destroy();gChart=null}
+  const ctx=document.getElementById('gc');
+  if(ctx) gChart=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:ss.map(s=>s.name),
+      datasets:[
+        {label:'SGPA',data:ss.map(s=>+s.sgpa.toFixed(2)),borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,.1)',tension:.4,fill:false,pointRadius:5,pointHoverRadius:7},
+        {label:'CGPA',data:runCG,borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',tension:.4,fill:false,pointRadius:5,pointHoverRadius:7,borderDash:[5,3]}
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        y:{min:0,max:10,grid:{color:'#334155'},ticks:{color:'#94a3b8'}},
+        x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}}
+      },
+      plugins:{legend:{labels:{color:'#f1f5f9'}}}
+    }
+  });
+}
+function expandSem(id){const r=document.getElementById('sx-'+id);if(r)r.style.display=r.style.display==='none'?'table-row':'none'}
+function delSem(id){
+  if(!confirm('Delete this semester?'))return;
+  const d=gd();d.semesters=d.semesters.filter(s=>s.id!==id);sd(d);renderDash();toast('Semester deleted');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// INTERNALS CALCULATOR — Template System
+// ════════════════════════════════════════════════════════════════════
+let curTmplId='tmpl_theory';
+let iCache={}; // {`${ci}-${ei}`: value}
+
+function renderInternals(){
+  const tmpls=getTmpls();
+  let tmpl=tmpls.find(t=>t.id===curTmplId)||tmpls[0];
+  if(!tmpl)return;
+  curTmplId=tmpl.id;
+
+  // Populate selector
+  const sel=document.getElementById('tmpl-sel');
+  sel.innerHTML=tmpls.map(t=>`<option value="${t.id}" ${t.id===curTmplId?'selected':''}>${t.name}${t.isDefault?' ★':''}</option>`).join('');
+
+  // Describe template
+  const totalCIA=tmpl.components.reduce((a,c)=>a+(c.ciaMarks||0),0);
+  document.getElementById('tmpl-desc').innerHTML=
+    `${tmpl.components.length} component(s) · CIA total: ${totalCIA}/50 · `+
+    tmpl.components.map(c=>`${c.name} (${c.ciaMarks} marks${c.bestOf?`, best ${c.bestOf} of ${c.entries.length}`:''})`).join(' · ');
+
+  // Edit/delete buttons
+  document.getElementById('edit-tmpl-btn').disabled=false;
+  document.getElementById('del-tmpl-btn').disabled=!!tmpl.isDefault;
+
+  renderCIAInputs(tmpl);
+  computeCIA();
+}
+
+function changeTmpl(id){
+  curTmplId=id;iCache={};renderInternals();
+  document.getElementById('endsem').value='';
+  document.getElementById('int-result').innerHTML='';
+}
+
+function renderCIAInputs(tmpl){
+  const html=tmpl.components.map((comp,ci)=>{
+    const hasBestOf=comp.bestOf&&comp.entries.length>comp.bestOf;
+    return `
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div style="font-weight:600;font-size:14px">${comp.name}</div>
+          <div style="font-size:11px;color:var(--mut);margin-top:2px">
+            ${hasBestOf?`Best <strong style="color:var(--pril)">${comp.bestOf}</strong> of ${comp.entries.length} counted · `:'All entries counted · '}
+            Contributes <strong style="color:var(--pril)">${comp.ciaMarks}</strong> CIA marks
+          </div>
+        </div>
+        <div id="cr-${ci}" style="text-align:right;min-width:90px"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${comp.entries.map((e,ei)=>`
+          <div class="ebox" id="eb-${ci}-${ei}" style="min-width:120px;flex:1">
+            <div class="etag" id="et-${ci}-${ei}"></div>
+            <div style="font-size:11px;color:var(--mut);font-weight:600;margin-bottom:7px">${e.label}</div>
+            <input type="number" min="0" max="${e.max}" step=".5" placeholder="0–${e.max}"
+              id="ei-${ci}-${ei}"
+              style="text-align:center;font-size:16px;font-weight:700;background:var(--sur)"
+              value="${iCache[ci+'-'+ei]!==undefined?iCache[ci+'-'+ei]:''}"
+              oninput="iCache['${ci}-${ei}']=this.value===''?null:parseFloat(this.value);computeCIA()">
+            <div class="emarks" id="em-${ci}-${ei}">—</div>
+            <div style="font-size:10px;color:var(--mut);text-align:center">% (out of ${e.max})</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('cia-inputs-area').innerHTML=html;
+}
+
+function computeComponentContrib(comp,ci){
+  const valid=comp.entries.map((e,ei)=>{
+    const v=iCache[ci+'-'+ei];
+    if(v===null||v===undefined||isNaN(v))return null;
+    return{pct:Math.min(v,e.max)/e.max*100,ei};
+  });
+  const nonNull=valid.filter(v=>v!==null);
+  if(!nonNull.length)return null;
+
+  // Highlight percentages
+  nonNull.forEach(v=>{
+    const el=document.getElementById('em-'+ci+'-'+v.ei);
+    if(el)el.textContent=v.pct.toFixed(1)+'%';
+  });
+  valid.filter(v=>v===null).forEach((_,rawEi)=>{
+    // find actual ei
+    comp.entries.forEach((_,ei)=>{
+      if(valid[ei]===null){const el=document.getElementById('em-'+ci+'-'+ei);if(el)el.textContent='—'}
+    });
+  });
+
+  let selected=nonNull;
+  let countedSet=new Set(nonNull.map(v=>v.ei));
+
+  if(comp.bestOf&&nonNull.length>comp.bestOf){
+    selected=[...nonNull].sort((a,b)=>b.pct-a.pct).slice(0,comp.bestOf);
+    countedSet=new Set(selected.map(v=>v.ei));
+  }
+
+  // Style boxes
+  comp.entries.forEach((_,ei)=>{
+    const box=document.getElementById('eb-'+ci+'-'+ei);
+    const tag=document.getElementById('et-'+ci+'-'+ei);
+    if(!box)return;
+    const hasVal=iCache[ci+'-'+ei]!==undefined&&iCache[ci+'-'+ei]!==null&&!isNaN(iCache[ci+'-'+ei]);
+    box.className='ebox';
+    tag.textContent='';tag.style.color='';
+    if(hasVal&&countedSet.has(ei)){
+      box.className='ebox counted';
+      if(comp.bestOf&&nonNull.length>comp.bestOf){tag.textContent='✓ counted';tag.style.color='var(--ok)'}
+    } else if(hasVal&&!countedSet.has(ei)){
+      box.className='ebox dropped';
+      tag.textContent='✗ dropped';tag.style.color='var(--mut)';
+    }
+  });
+
+  const avgPct=selected.reduce((a,v)=>a+v.pct,0)/selected.length;
+  return{contrib:avgPct/100*comp.ciaMarks,avgPct,countedSet};
+}
+
+function computeCIA(){
+  const tmpls=getTmpls();
+  const tmpl=tmpls.find(t=>t.id===curTmplId);
+  if(!tmpl)return;
+
+  let totalCIA=0;let anyFilled=false;
+  const results=tmpl.components.map((comp,ci)=>{
+    const r=computeComponentContrib(comp,ci);
+    const el=document.getElementById('cr-'+ci);
+    if(el){
+      if(r!==null){
+        el.innerHTML=`<span style="font-size:20px;font-weight:800;color:var(--pril)">${r.contrib.toFixed(1)}</span><span style="color:var(--mut);font-size:11px"> / ${comp.ciaMarks}</span>`;
+        totalCIA+=r.contrib;anyFilled=true;
+      } else {
+        el.innerHTML=`<span style="color:var(--mut);font-size:11px">— / ${comp.ciaMarks}</span>`;
+      }
+    }
+    return r;
+  });
+
+  const endV=parseFloat(document.getElementById('endsem')?.value);
+  const end=isNaN(endV)?null:Math.min(endV,50);
+  const total=anyFilled&&end!==null?totalCIA+end:null;
+  const g=total!==null?gfm(total):null;
+
+  let html='';
+  if(anyFilled){
+    html=`<div class="div"></div>
+    <div class="g${total!==null?'3':'2'}" style="text-align:center">
+      <div>
+        <div style="font-size:11px;color:var(--mut);margin-bottom:4px">CIA Total</div>
+        <div style="font-size:32px;font-weight:800;color:var(--ok)">${totalCIA.toFixed(1)}</div>
+        <div style="font-size:11px;color:var(--mut)">out of 50</div>
+      </div>
+      ${end!==null?`<div>
+        <div style="font-size:11px;color:var(--mut);margin-bottom:4px">End Semester</div>
+        <div style="font-size:32px;font-weight:800;color:var(--warn)">${end.toFixed(1)}</div>
+        <div style="font-size:11px;color:var(--mut)">out of 50</div>
+      </div>`:''}
+      ${total!==null?`<div>
+        <div style="font-size:11px;color:var(--mut);margin-bottom:4px">Total → Grade</div>
+        <div style="font-size:32px;font-weight:800;color:${g.c}">${total.toFixed(1)}</div>
+        <div style="font-size:11px;color:${g.c};font-weight:700">${g.g} · ${g.p} pts · ${g.d}</div>
+      </div>`:''}
+    </div>
+    ${total!==null?`
+    <div class="pbar" style="margin-top:14px;height:8px">
+      <div class="pfill" style="width:${Math.min(total,100)}%;background:${g.c}"></div>
+    </div>
+    <div style="font-size:11px;color:var(--mut);text-align:center;margin-top:4px">${total.toFixed(1)} / 100</div>`:''}`;
+  }
+  document.getElementById('int-result').innerHTML=html;
+  computeEndNeed(totalCIA,anyFilled);
+}
+
+function computeEndNeed(cia,filled){
+  if(cia===undefined){
+    // Called from grade selector — recompute CIA
+    const tmpls=getTmpls();const tmpl=tmpls.find(t=>t.id===curTmplId);if(!tmpl)return;
+    let total=0;let f=false;
+    tmpl.components.forEach((comp,ci)=>{
+      const r=computeComponentContrib(comp,ci);if(r){total+=r.contrib;f=true}
+    });
+    cia=total;filled=f;
+  }
+  const tgt=parseInt(document.getElementById('tgt-grade')?.value||5);
+  const tg=gfp(tgt);
+  const needed=Math.max(0,tg.min-cia);
+  let html='';
+  if(needed>50){
+    html=`<div class="al ae">❌ <strong>${tg.g} (${tg.d})</strong> is not achievable — requires ${needed.toFixed(1)}/50 in End Sem (exceeds max of 50). ${filled?`Your CIA is ${cia.toFixed(1)}/50.`:''}</div>`;
+  } else {
+    const col=needed<=20?'var(--ok)':needed<=38?'var(--warn)':'var(--err)';
+    html=`<div class="al ai">
+      For <strong>${tg.g} — ${tg.d}</strong>, you need at least <strong style="color:${col}">${needed.toFixed(1)} / 50</strong> in End Sem.
+      ${filled?`<br><small style="opacity:.75">CIA: ${cia.toFixed(1)} + End Sem: ${needed.toFixed(1)} = ${(cia+needed).toFixed(1)} ≥ ${tg.min}</small>`:'<br><small style="opacity:.75">Enter your CIA marks above for a personalised calculation.</small>'}
+    </div>`;
+  }
+  document.getElementById('endsem-need').innerHTML=html;
+}
+
+// ── Template Editor Modal ─────────────────────────────────────────
+let eTmpl=null;
+
+function openNewTmpl(){
+  eTmpl={id:'tmpl_'+Date.now(),name:'',isDefault:false,components:[]};
+  document.getElementById('modal-title').textContent='New Subject Template';
+  renderTmplEditor();
+  document.getElementById('tmpl-modal').classList.add('open');
+}
+
+function openEditTmpl(){
+  const t=getTmpls().find(t=>t.id===curTmplId);if(!t)return;
+  eTmpl=JSON.parse(JSON.stringify(t));
+  document.getElementById('modal-title').textContent='Edit Template: '+t.name;
+  renderTmplEditor();
+  document.getElementById('tmpl-modal').classList.add('open');
+}
+
+function closeModal(){document.getElementById('tmpl-modal').classList.remove('open');eTmpl=null}
+
+function renderTmplEditor(){
+  const total=eTmpl.components.reduce((a,c)=>a+(c.ciaMarks||0),0);
+  const tOk=total===50;
+  document.getElementById('tmpl-editor').innerHTML=`
+    <div class="al ${tOk?'as':'aw'}" id="cia-ind">
+      CIA components total: <strong>${total} / 50</strong> ${tOk?'✓ Correct':'⚠ Must equal exactly 50'}
+    </div>
+    <div class="fg">
+      <label>Template Name *</label>
+      <input type="text" id="te-name" value="${eTmpl.name}" placeholder="e.g. EC Theory + Lab" oninput="eTmpl.name=this.value">
+    </div>
+    ${eTmpl.components.map((comp,ci)=>`
+      <div style="background:var(--sur2);border-radius:9px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700;color:var(--mut)">COMPONENT ${ci+1}</span>
+          <button class="btn bd bsm" onclick="rmComp(${ci})">Remove Component</button>
+        </div>
+        <div class="g2" style="margin-bottom:10px">
+          <div class="fg" style="margin-bottom:0">
+            <label>Name</label>
+            <input type="text" value="${comp.name}" placeholder="e.g. Lab Work"
+              oninput="eTmpl.components[${ci}].name=this.value">
+          </div>
+          <div class="fg" style="margin-bottom:0">
+            <label>CIA Marks contributed (must sum to 50)</label>
+            <input type="number" min="0" max="50" step="1" value="${comp.ciaMarks}"
+              oninput="eTmpl.components[${ci}].ciaMarks=parseFloat(this.value)||0;refreshCIAInd()">
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:10px">
+          <label>Take best <em>N</em> entries (blank = count all entries)</label>
+          <input type="number" min="1" max="${comp.entries.length}" step="1"
+            value="${comp.bestOf||''}" placeholder="e.g. 2 to count best 2 of 3 tests"
+            oninput="eTmpl.components[${ci}].bestOf=this.value?parseInt(this.value):null">
+        </div>
+        <div style="font-size:11px;color:var(--mut);font-weight:700;margin-bottom:6px">ENTRIES (the inputs the user will fill in)</div>
+        ${comp.entries.map((e,ei)=>`
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+            <input type="text" value="${e.label}" placeholder="Label"
+              oninput="eTmpl.components[${ci}].entries[${ei}].label=this.value" style="flex:2">
+            <span style="color:var(--mut);font-size:12px;white-space:nowrap">out of</span>
+            <input type="number" min="1" value="${e.max}"
+              oninput="eTmpl.components[${ci}].entries[${ei}].max=parseFloat(this.value)||50" style="flex:1;max-width:80px">
+            ${comp.entries.length>1?`<button class="btn bd bsm" onclick="rmEntry(${ci},${ei})">×</button>`:'<span style="width:36px"></span>'}
+          </div>
+        `).join('')}
+        <button class="btn bs bsm" style="margin-top:4px"
+          onclick="eTmpl.components[${ci}].entries.push({label:'Entry '+(eTmpl.components[${ci}].entries.length+1),max:50});renderTmplEditor()">
+          + Add Entry
+        </button>
+      </div>
+    `).join('')}
+    <button class="btn bs bfw" style="margin-top:4px"
+      onclick="eTmpl.components.push({id:'c'+Date.now(),name:'New Component',ciaMarks:0,bestOf:null,entries:[{label:'Entry 1',max:50}]});renderTmplEditor()">
+      + Add Component
+    </button>`;
+}
+
+function refreshCIAInd(){
+  const total=eTmpl.components.reduce((a,c)=>a+(c.ciaMarks||0),0);
+  const el=document.getElementById('cia-ind');
+  if(el){
+    const ok=total===50;
+    el.className='al '+(ok?'as':'aw');
+    el.innerHTML=`CIA components total: <strong>${total} / 50</strong> ${ok?'✓ Correct':'⚠ Must equal exactly 50'}`;
+  }
+}
+
+function rmComp(ci){eTmpl.components.splice(ci,1);renderTmplEditor()}
+function rmEntry(ci,ei){eTmpl.components[ci].entries.splice(ei,1);renderTmplEditor()}
+
+function saveTmpl(){
+  if(!eTmpl.name.trim()){toast('Template name is required','err');return}
+  const tot=eTmpl.components.reduce((a,c)=>a+(c.ciaMarks||0),0);
+  if(tot!==50){toast(`CIA marks must total 50 (currently ${tot})`,'err');return}
+  if(!eTmpl.components.length){toast('Add at least one component','err');return}
+  for(const comp of eTmpl.components){
+    if(!comp.entries.length){toast(`Component "${comp.name}" has no entries`,'err');return}
+    if(comp.bestOf&&comp.bestOf>=comp.entries.length){toast(`"${comp.name}": Best-of N must be less than number of entries`,'err');return}
+  }
+  const d=gd();
+  if(!d.templates)d.templates=[];
+  const idx=d.templates.findIndex(t=>t.id===eTmpl.id);
+  if(idx>=0)d.templates[idx]={...eTmpl};
+  else d.templates.push({...eTmpl});
+  sd(d);
+  curTmplId=eTmpl.id;
+  iCache={};
+  closeModal();
+  renderInternals();
+  renderTmplSettings();
+  toast('Template saved!');
+}
+
+function delTmpl(){
+  const t=getTmpls().find(x=>x.id===curTmplId);
+  if(!t||t.isDefault){toast("Can't delete built-in templates",'warn');return}
+  if(!confirm('Delete template "'+t.name+'"?'))return;
+  const d=gd();d.templates=d.templates.filter(x=>x.id!==curTmplId);
+  curTmplId=(d.templates[0]||{}).id||'tmpl_theory';
+  iCache={};sd(d);renderInternals();renderTmplSettings();toast('Template deleted');
+}
+
+function renderTmplSettings(){
+  const tmpls=getTmpls();
+  document.getElementById('tmpl-list-settings').innerHTML=`
+    <table>
+      <thead><tr><th>Template</th><th>Components</th><th>Type</th><th></th></tr></thead>
+      <tbody>${tmpls.map(t=>`<tr>
+        <td>${t.name}</td>
+        <td>${t.components.map(c=>`${c.name} (${c.ciaMarks}m)`).join(', ')}</td>
+        <td>${t.isDefault?'<span class="bdg bn">Built-in</span>':'<span class="bdg bk">Custom</span>'}</td>
+        <td>${!t.isDefault?`<button class="btn bd bsm" onclick="delTmplById('${t.id}')">Delete</button>`:'—'}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    <button class="btn bp2" style="margin-top:12px" onclick="goTab(document.querySelector('nav button:nth-child(2)'),\'internals\');openNewTmpl()">+ New Template</button>`;
+}
+
+function delTmplById(id){
+  const d=gd();const t=d.templates?.find(x=>x.id===id);
+  if(!t||t.isDefault){toast("Can't delete built-in templates",'warn');return}
+  if(!confirm('Delete "'+t.name+'"?'))return;
+  d.templates=d.templates.filter(x=>x.id!==id);
+  if(curTmplId===id)curTmplId=(d.templates[0]||{}).id||'tmpl_theory';
+  sd(d);renderTmplSettings();toast('Deleted');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SEMESTER MANAGER
+// ════════════════════════════════════════════════════════════════════
+let courses=[];
+
+function toggleCM(){
+  const m=document.getElementById('cm').value;
+  document.getElementById('cm-marks').style.display=m==='marks'?'block':'none';
+  document.getElementById('cm-grade').style.display=m==='grade'?'block':'none';
+}
+
+function prevGrade(){
+  const v=parseFloat(document.getElementById('cmk').value);
+  if(isNaN(v)){document.getElementById('gprev').innerHTML='';return}
+  const g=gfm(Math.min(v,100));
+  document.getElementById('gprev').innerHTML=`
+    <div style="display:inline-flex;align-items:center;gap:8px;background:var(--sur2);padding:6px 13px;border-radius:8px;margin-top:6px;margin-bottom:6px">
+      <span style="font-size:20px;font-weight:800;color:${g.c}">${g.g}</span>
+      <span style="color:var(--mut);font-size:12px">${g.p} pts · ${g.d}</span>
+    </div>`;
+}
+
+function addCourse(){
+  const name=document.getElementById('cn').value.trim();
+  const cred=parseInt(document.getElementById('cc').value);
+  const meth=document.getElementById('cm').value;
+  if(!name){toast('Enter course name','err');return}
+  if(!cred||cred<1){toast('Enter valid credits','err');return}
+  let pt,marks=null,grade;
+  if(meth==='marks'){
+    marks=parseFloat(document.getElementById('cmk').value);
+    if(isNaN(marks)||marks<0||marks>100){toast('Enter valid marks (0–100)','err');return}
+    const g=gfm(marks);pt=g.p;grade=g.g;
+  } else {
+    pt=parseInt(document.getElementById('cgs').value);grade=gfp(pt).g;
+  }
+  courses.push({id:Date.now().toString(),name,credits:cred,pt,marks,grade});
+  document.getElementById('cn').value='';document.getElementById('cmk').value='';
+  document.getElementById('gprev').innerHTML='';
+  renderCourseList();
+}
+
+function rmCourse(id){courses=courses.filter(c=>c.id!==id);renderCourseList()}
+
+function renderCourseList(){
+  const el=document.getElementById('clist');
+  if(!courses.length){
+    el.innerHTML='<p style="color:var(--mut);font-size:13px">No courses added yet.</p>';
+    document.getElementById('sgpa-prev').innerHTML='';return;
+  }
+  el.innerHTML=`<table>
+    <thead><tr><th>Course</th><th>Credits</th><th>Grade</th><th>Pts</th><th>Marks</th><th></th></tr></thead>
+    <tbody>${courses.map(c=>{const g=gfp(c.pt);return`<tr>
+      <td>${c.name}</td><td>${c.credits}</td>
+      <td><span style="color:${g.c};font-weight:700">${c.grade}</span></td>
+      <td>${c.pt}</td><td>${c.marks!=null?c.marks+'/100':'—'}</td>
+      <td><button class="btn bd bsm" onclick="rmCourse('${c.id}')">×</button></td>
+    </tr>`}).join('')}</tbody>
+  </table>`;
+  const s=sgpa(courses);const tc=courses.reduce((a,c)=>a+c.credits,0);
+  const cls=classify(s,courses.some(c=>c.pt===0));
+  document.getElementById('sgpa-prev').innerHTML=`
+    <div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap">
+      <div><div class="sl">SGPA</div><div class="sv" style="color:${cc(s)}">${s.toFixed(2)}</div></div>
+      <div><div class="sl">Credits</div><div class="sv" style="font-size:28px">${tc}</div></div>
+      <span class="bdg ${cls.b}">${cls.l}</span>
+    </div>`;
+}
+
+function saveSem(){
+  if(!courses.length){toast('Add at least one course','err');return}
+  const nm=document.getElementById('sem-sel').value;
+  const d=gd();d.semesters=d.semesters.filter(s=>s.name!==nm);
+  d.semesters.push({id:Date.now().toString(),name:nm,courses:[...courses],sgpa:sgpa(courses),tc:courses.reduce((a,c)=>a+c.credits,0)});
+  d.semesters.sort((a,b)=>(parseInt(a.name.replace(/\D/g,''))||0)-(parseInt(b.name.replace(/\D/g,''))||0));
+  sd(d);courses=[];renderCourseList();toast(nm+' saved!');
+}
+function clearSem(){courses=[];renderCourseList()}
+
+// ════════════════════════════════════════════════════════════════════
+// PREDICTOR
+// ════════════════════════════════════════════════════════════════════
+function renderPred(){
+  const d=gd(),ss=d.semesters,cg=cgpa(ss);
+  const tc=ss.reduce((a,s)=>a+s.tc,0);
+  const prog=d.profile.programme==='mtech'?225:180;
+  const tsems=d.profile.programme==='mtech'?10:8;
+  const rem=Math.max(0,tsems-ss.length);
+  if(!ss.length){
+    document.getElementById('pred-cur').innerHTML='<p style="color:var(--mut)">No semester data yet.</p>';
+    document.getElementById('pred-res').innerHTML='';return;
+  }
+  document.getElementById('pred-cur').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><div class="sl">Current CGPA</div><div class="sv" style="color:${cc(cg)}">${cg.toFixed(2)}</div></div>
+      <div><div class="sl">Credits Earned</div><div class="sv" style="font-size:26px">${tc}</div></div>
+      <div><div class="sl">Semesters Left</div><div class="sv" style="font-size:26px">${rem}</div></div>
+    </div>`;
+  computePred();
+}
+
+function computePred(){
+  const d=gd(),ss=d.semesters;if(!ss.length)return;
+  const cg=cgpa(ss),tc=ss.reduce((a,s)=>a+s.tc,0);
+  const prog=d.profile.programme==='mtech'?225:180;
+  const tsems=d.profile.programme==='mtech'?10:8;
+  const rem=Math.max(0,tsems-ss.length);
+  const tgt=parseFloat(document.getElementById('tgt-cgpa')?.value||7.5);
+  const cps=parseInt(document.getElementById('cps')?.value||22);
+
+  if(rem===0){
+    document.getElementById('pred-res').innerHTML=`<div class="al ai">All semesters done! Final CGPA: <strong>${cg.toFixed(2)}</strong></div>`;return;
+  }
+  const remC=rem*cps,needed=(tgt*(tc+remC)-cg*tc)/remC;
+  const nCol=needed>10?'var(--err)':needed<=7?'var(--ok)':needed<=8.5?'var(--warn)':'var(--err)';
+  const nBdg=needed>10?'<span class="bdg br">Not achievable</span>':
+    needed<=7?'<span class="bdg bk">✓ Very achievable</span>':
+    needed<=8.5?'<span class="bdg bb">Achievable with effort</span>':
+    needed<=9.5?'<span class="bdg bg">Challenging</span>':'<span class="bdg br">Extremely difficult</span>';
+
+  const scenarios=[
+    {t:7.5,l:'First Class with Distinction',b:'bg'},
+    {t:6.0,l:'First Class',b:'bb'},
+    {t:5.0,l:'Second Class',b:'bp'}
+  ];
+  const scRows=scenarios.map(sc=>{
+    const r=(sc.t*(tc+remC)-cg*tc)/remC;
+    const ok=r<=10;
+    const col=ok?(r<=7?'var(--ok)':r<=8.5?'var(--warn)':'var(--err)'):'var(--err)';
+    return`<tr>
+      <td><span class="bdg ${sc.b}">${sc.l}</span></td><td>CGPA ≥ ${sc.t}</td>
+      <td style="font-weight:700;color:${col}">${ok?r.toFixed(2)+' avg SGPA':'Not achievable'}</td>
+      <td>${!ok?'✗':r<=7?'✓ Easy':r<=8.5?'⚠ Manageable':r<=10?'⚠ Very hard':'✗'}</td>
+    </tr>`;
+  }).join('');
+
+  const planRows=Array.from({length:rem},(_,i)=>{
+    const sc=(tc+(i+1)*cps);
+    const pCG=Math.min((cg*tc+Math.min(needed,10)*(i+1)*cps)/sc,10);
+    const cls=classify(pCG,false);
+    return`<tr>
+      <td>Semester ${ss.length+i+1}</td>
+      <td style="font-weight:700;color:${needed>10?'var(--err)':nCol}">${Math.min(needed,10).toFixed(2)}</td>
+      <td style="font-weight:700">${pCG.toFixed(2)}</td>
+      <td><span class="bdg ${cls.b}">${cls.l}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('pred-res').innerHTML=`
+    <div class="card">
+      <div class="ct">Required for CGPA ${tgt}</div>
+      ${needed>10?`<div class="al ae">❌ CGPA ${tgt} is <strong>mathematically impossible</strong> — would need ${needed.toFixed(2)} SGPA (max is 10) in ${rem} remaining semesters at ${cps} credits each.</div>`:
+      `<div style="text-align:center;padding:14px 0">
+        <div class="sl">Average SGPA needed</div>
+        <div class="sv" style="font-size:58px;color:${nCol}">${needed.toFixed(2)}</div>
+        <div class="sl" style="margin-top:4px">across ${rem} remaining semester(s)</div>
+        <div style="margin-top:10px">${nBdg}</div>
+      </div>`}
+    </div>
+    <div class="card">
+      <div class="ct">All Classifications</div>
+      <table><thead><tr><th>Classification</th><th>Requirement</th><th>Avg SGPA Needed</th><th>Feasibility</th></tr></thead>
+      <tbody>${scRows}</tbody></table>
+    </div>
+    <div class="card">
+      <div class="ct">Semester-by-Semester Projection</div>
+      <table><thead><tr><th>Semester</th><th>Target SGPA</th><th>Projected CGPA</th><th>Classification</th></tr></thead>
+      <tbody>${planRows}</tbody></table>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════════════════════
+function loadProfile(){
+  const p=gd().profile;
+  document.getElementById('pn').value=p.name||'';
+  document.getElementById('pb').value=p.branch||'Electronics & Communication Engineering';
+  document.getElementById('py').value=p.batch||'';
+  document.getElementById('pp').value=p.programme||'btech';
+}
+
+function saveProfile(){
+  const d=gd();
+  d.profile.name=document.getElementById('pn').value.trim();
+  d.profile.branch=document.getElementById('pb').value.trim();
+  d.profile.batch=document.getElementById('py').value.trim();
+  d.profile.programme=document.getElementById('pp').value;
+  sd(d);toast('Profile saved!');
+}
+
+function exportData(){
+  const b=new Blob([JSON.stringify(gd(),null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='sastra_tracker_backup.json';a.click();
+}
+
+function importData(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{try{sd(JSON.parse(ev.target.result));toast('Imported!');renderDash()}catch{toast('Invalid file','err')}};
+  r.readAsText(f);
+}
+
+function clearAll(){
+  if(!confirm('Delete ALL data? This cannot be undone.'))return;
+  localStorage.removeItem(KEY);toast('Cleared');renderDash();
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderDash();
+renderCourseList();
+</script>
+</body>
+</html>
