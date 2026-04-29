@@ -339,17 +339,23 @@ const gd=()=>{try{return JSON.parse(localStorage.getItem(KEY))||mk()}catch{retur
 const sd=d=>localStorage.setItem(KEY,JSON.stringify(d));
 
 // ── Default Templates ─────────────────────────────────────────────
+const TMPL_VER=2;
+
 const DEFTMPLS=[
   {
+    // Theory: CAT1→20 + CAT2→20 + Assignment→10 = 50
     id:'tmpl_theory',name:'Theory (Standard)',isDefault:true,
     components:[
-      {id:'tc1',name:'CAT Tests',ciaMarks:40,bestOf:2,
-       entries:[{label:'CAT 1',max:50},{label:'CAT 2',max:50},{label:'CAT 3 / Model',max:100}]},
-      {id:'tc2',name:'Assignment / Quiz / Seminar',ciaMarks:10,bestOf:null,
+      {id:'tc1',name:'CAT 1',ciaMarks:20,bestOf:null,
+       entries:[{label:'CAT 1 Marks',max:50}]},
+      {id:'tc2',name:'CAT 2',ciaMarks:20,bestOf:null,
+       entries:[{label:'CAT 2 Marks',max:50}]},
+      {id:'tc3',name:'Assignment / Quiz / Seminar',ciaMarks:10,bestOf:null,
        entries:[{label:'Assignment',max:10}]}
     ]
   },
   {
+    // Lab: Experimental→40 + Viva→10 = 50
     id:'tmpl_lab',name:'Lab (Standard)',isDefault:true,
     components:[
       {id:'lc1',name:'Experimental Work & Observations',ciaMarks:40,bestOf:null,
@@ -359,21 +365,29 @@ const DEFTMPLS=[
     ]
   },
   {
-    id:'tmpl_tl',name:'Theory + Lab (Combined)',isDefault:true,
+    // SLST: Theory test→15 + Lab→15 + Viva/Assignment→20 = 50
+    id:'tmpl_slst',name:'Semi-Lab Semi-Theory (SLST)',isDefault:true,
     components:[
-      {id:'tlc1',name:'Theory Tests',ciaMarks:25,bestOf:1,
-       entries:[{label:'CAT 1',max:50},{label:'CAT 2',max:50}]},
-      {id:'tlc2',name:'Lab Work',ciaMarks:15,bestOf:null,
+      {id:'sc1',name:'Theory Test (CAT)',ciaMarks:15,bestOf:null,
+       entries:[{label:'CAT Marks',max:50}]},
+      {id:'sc2',name:'Lab Work',ciaMarks:15,bestOf:null,
        entries:[{label:'Lab Marks',max:50}]},
-      {id:'tlc3',name:'Assignment / Viva',ciaMarks:10,bestOf:null,
-       entries:[{label:'Assignment / Viva',max:10}]}
+      {id:'sc3',name:'Viva / Assignment',ciaMarks:20,bestOf:null,
+       entries:[{label:'Viva / Assignment',max:20}]}
     ]
   }
 ];
 
 function getTmpls(){
   const d=gd();
-  if(!d.templates||d.templates.length===0){d.templates=DEFTMPLS;sd(d)}
+  // Reset templates if missing or outdated version
+  if(!d.templates||d.templates.length===0||d.tmplVer!==TMPL_VER){
+    // Preserve any custom (non-default) templates the user created
+    const custom=(d.templates||[]).filter(t=>!t.isDefault);
+    d.templates=[...DEFTMPLS,...custom];
+    d.tmplVer=TMPL_VER;
+    sd(d);
+  }
   return d.templates;
 }
 
