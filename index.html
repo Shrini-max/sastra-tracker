@@ -339,42 +339,41 @@ const gd=()=>{try{return JSON.parse(localStorage.getItem(KEY))||mk()}catch{retur
 const sd=d=>localStorage.setItem(KEY,JSON.stringify(d));
 
 // ── Default Templates ─────────────────────────────────────────────
-const TMPL_VER=3;
+const TMPL_VER=4;
 
 const DEFTMPLS=[
   {
-    // Theory: both MID-TERM tests entered directly out of 20 each, Assignment out of 10
+    // Theory: write test out of 50 → scaled to 20 CIA marks each
     // e.g. ECE104, ECE202, EIE301, MAT301R01
     id:'tmpl_theory',name:'Theory (Standard)',isDefault:true,
     components:[
       {id:'tc1',name:'1st Mid-Term Test',ciaMarks:20,bestOf:null,
-       entries:[{label:'Marks Obtained',max:20}]},
+       entries:[{label:'Marks (out of 50)',max:50}]},
       {id:'tc2',name:'2nd Mid-Term Test',ciaMarks:20,bestOf:null,
-       entries:[{label:'Marks Obtained',max:20}]},
+       entries:[{label:'Marks (out of 50)',max:50}]},
       {id:'tc3',name:'Assignment / Seminar / Quiz',ciaMarks:10,bestOf:null,
-       entries:[{label:'Assignment',max:10}]}
+       entries:[{label:'Assignment (out of 10)',max:10}]}
     ]
   },
   {
-    // Lab: single practical internal mark out of 50 (as shown in SWI)
-    // e.g. ECE203R01 — college gives one combined internal mark
+    // Lab: single practical internal mark out of 50 (direct, no scaling)
     id:'tmpl_lab',name:'Lab (Standard)',isDefault:true,
     components:[
       {id:'lc1',name:'Practical Internal Mark',ciaMarks:50,bestOf:null,
-       entries:[{label:'Lab Internal Mark',max:50}]}
+       entries:[{label:'Lab Internal Mark (out of 50)',max:50}]}
     ]
   },
   {
-    // SLST: CIA-FIRST TEST out of 15 + CIA-SECOND TEST out of 15 + Lab/Viva out of 20
-    // e.g. ECE115 (Semiconductor Process & Device Modeling)
+    // SLST: write test out of 50 → scaled to 15 CIA marks each; Lab/Viva out of 20 direct
+    // e.g. ECE115
     id:'tmpl_slst',name:'Semi-Lab Semi-Theory (SLST)',isDefault:true,
     components:[
       {id:'sc1',name:'CIA - First Test',ciaMarks:15,bestOf:null,
-       entries:[{label:'Marks Obtained',max:15}]},
+       entries:[{label:'Marks (out of 50)',max:50}]},
       {id:'sc2',name:'CIA - Second Test',ciaMarks:15,bestOf:null,
-       entries:[{label:'Marks Obtained',max:15}]},
+       entries:[{label:'Marks (out of 50)',max:50}]},
       {id:'sc3',name:'Lab / Viva',ciaMarks:20,bestOf:null,
-       entries:[{label:'Lab / Viva Marks',max:20}]}
+       entries:[{label:'Lab / Viva Marks (out of 20)',max:20}]}
     ]
   }
 ];
