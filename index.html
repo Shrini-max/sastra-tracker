@@ -369,16 +369,18 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
       <!-- PREDICTOR -->
       <div class="tab" id="tab-predictor">
         <div class="page-title">CGPA Predictor</div>
-        <div class="page-sub">Calculate what SGPA you need in remaining semesters to reach your target CGPA.</div>
+        <div class="page-sub">Simulate arrear clearance, plan your next semester, and predict your final CGPA.</div>
 
         <div class="g2" style="margin-bottom:14px">
           <div class="card" style="margin-bottom:0"><div class="ct">Current Standing</div><div id="pred-cur"></div></div>
           <div class="card" style="margin-bottom:0">
-            <div class="ct">Target</div>
+            <div class="ct">Target CGPA</div>
             <div class="fg"><label>Target CGPA</label><input type="number" id="tgt-cgpa" min="5" max="10" step=".1" value="7.5" oninput="computePred()"></div>
             <div class="fg"><label>Credits per remaining semester (approx)</label><input type="number" id="cps" min="10" max="30" value="22" oninput="computePred()"></div>
           </div>
         </div>
+        <div id="arrear-sim"></div>
+        <div id="sem-planner"></div>
         <div id="pred-res"></div>
       </div>
 
@@ -1425,79 +1427,274 @@ function clearSem() { courses=[]; renderCourseList(); }
 // ════════════════════════════════════════════════════════════════════
 // CGPA PREDICTOR
 // ════════════════════════════════════════════════════════════════════
+let plannedCourses = [];
+let arrearOverrides = {}; // key: `${semId}-${courseId}` → gradePoint override
+
 function renderPred() {
-  const d = gd(), ss = d.semesters, cg = cgpa(ss);
+  const d   = gd(), ss = d.semesters, cg = cgpa(ss);
   const tc  = ss.reduce((a,s) => a+s.tc, 0);
-  const prog = d.profile.programme==='mtech'?225:180;
   const tsems = d.profile.programme==='mtech'?10:8;
-  const rem = Math.max(0, tsems-ss.length);
+  const curSem = d.profile.currentSem || Math.min(ss.length+1, tsems);
+  const rem  = Math.max(0, tsems - curSem);
+
+  plannedCourses = d.plannedCourses || [];
+
   if (!ss.length) {
-    document.getElementById('pred-cur').innerHTML = '<p style="color:var(--txm)">No semester data yet.</p>';
-    document.getElementById('pred-res').innerHTML = ''; return;
+    document.getElementById('pred-cur').innerHTML   = '<p style="color:var(--txm)">No semester data yet.</p>';
+    document.getElementById('pred-res').innerHTML   = '';
+    document.getElementById('arrear-sim').innerHTML = '';
+    document.getElementById('sem-planner').innerHTML= '';
+    return;
   }
+
+  // ── Current Standing ──────────────────────────────────────────
+  const semOpts = Array.from({length:tsems},(_,i) =>
+    `<option value="${i+1}" ${curSem===i+1?'selected':''}>Semester ${i+1}</option>`
+  ).join('');
+
   document.getElementById('pred-cur').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div>
         <div style="font-size:10px;color:var(--txd);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Current CGPA</div>
         <div style="font-size:42px;font-weight:800;letter-spacing:-1.5px;color:${cc(cg)}">${cg.toFixed(2)}</div>
       </div>
-      <div style="display:flex;gap:20px;font-size:13px">
-        <div><div style="color:var(--txd);font-size:11px;margin-bottom:2px">Credits</div><div style="font-weight:700">${tc}</div></div>
-        <div><div style="color:var(--txd);font-size:11px;margin-bottom:2px">Semesters left</div><div style="font-weight:700">${rem}</div></div>
+      <div style="display:flex;gap:20px">
+        <div><div style="color:var(--txd);font-size:11px;margin-bottom:2px">Credits earned</div><div style="font-weight:700;font-size:13px">${tc}</div></div>
+        <div><div style="color:var(--txd);font-size:11px;margin-bottom:2px">Semesters left</div><div style="font-weight:700;font-size:13px">${rem}</div></div>
+      </div>
+      <div>
+        <label style="margin-bottom:6px">You are currently in</label>
+        <select onchange="saveCurrentSem(this.value)" style="width:auto">${semOpts}</select>
       </div>
     </div>`;
+
+  renderArrearSim(ss, cg, tc);
+  renderSemPlanner(d, ss, curSem, cg, tc);
   computePred();
 }
 
+function saveCurrentSem(val) {
+  const d = gd(); d.profile.currentSem = parseInt(val); sd(d); renderPred();
+}
+
+// ── Arrear Clearance Simulator ─────────────────────────────────
+function renderArrearSim(ss, baseCG, baseTC) {
+  const el = document.getElementById('arrear-sim');
+  const arrears = [];
+  ss.forEach(sem => sem.courses.forEach(c => {
+    if (c.pt === 0) arrears.push({semId:sem.id, semName:sem.name, courseId:c.id, courseName:c.name, credits:c.credits});
+  }));
+
+  if (!arrears.length) { el.innerHTML=''; return; }
+
+  const simCG = computeSimCGPA(ss, arrearOverrides);
+  const diff  = simCG - baseCG;
+  const hasOverrides = Object.keys(arrearOverrides).length > 0;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="ct">Arrear Clearance Simulator</div>
+      <p style="font-size:13px;color:var(--txm);margin-bottom:14px">
+        You have <strong style="color:var(--er)">${arrears.length} arrear(s)</strong>.
+        Toggle each to simulate clearing it and see the impact on your CGPA.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px">
+        ${arrears.map(a => {
+          const key = `${a.semId}-${a.courseId}`;
+          const on  = arrearOverrides[key] !== undefined;
+          const gpt = arrearOverrides[key] || 5;
+          const gradeOpts = GS.filter(g=>g.p>0).map(g=>`<option value="${g.p}" ${gpt===g.p?'selected':''}>${g.g} — ${g.p} pts</option>`).join('');
+          return `
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:${on?'rgba(34,197,94,.06)':'rgba(255,255,255,.03)'};border:1px solid ${on?'rgba(34,197,94,.3)':'var(--bdr)'};border-radius:var(--rs);flex-wrap:wrap;transition:all .2s">
+              <input type="checkbox" ${on?'checked':''} style="width:16px;height:16px;accent-color:var(--ok);cursor:pointer;flex-shrink:0"
+                onchange="toggleArrear('${key}',this.checked)">
+              <div style="flex:1;min-width:100px">
+                <div style="font-size:13px;font-weight:600">${a.courseName}</div>
+                <div style="font-size:11px;color:var(--txm)">${a.semName} · ${a.credits} cr</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;${on?'':'opacity:.35;pointer-events:none'}">
+                <span style="font-size:12px;color:var(--er);font-weight:700">F →</span>
+                <select style="font-size:12px;padding:5px 8px;width:auto" ${on?'':'disabled'}
+                  onchange="setArrearGrade('${key}',parseInt(this.value))">${gradeOpts}</select>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+      ${hasOverrides ? `
+        <div style="display:flex;align-items:center;gap:20px;padding:14px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:var(--rs);flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Current CGPA</div>
+            <div style="font-size:30px;font-weight:800;color:${cc(baseCG)}">${baseCG.toFixed(2)}</div>
+          </div>
+          <div style="font-size:22px;color:var(--txd)">→</div>
+          <div>
+            <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Simulated CGPA</div>
+            <div style="font-size:30px;font-weight:800;color:${cc(simCG)}">${simCG.toFixed(2)}</div>
+          </div>
+          <div>
+            <span class="bdg ${diff>0?'bk':diff<0?'br':'bn'}">${diff>0?'▲ +':'▼ '}${Math.abs(diff).toFixed(2)} pts</span>
+            ${diff>0?`<div style="font-size:11px;color:var(--ok);margin-top:5px">Clearing these arrears boosts your CGPA</div>`:''}
+            ${simCG>=7.5&&baseCG<7.5?`<div style="font-size:11px;color:var(--ok);margin-top:3px">🎉 Distinction becomes achievable!</div>`:''}
+          </div>
+        </div>` : ''}
+    </div>`;
+}
+
+function computeSimCGPA(ss, overrides) {
+  if (!Object.keys(overrides).length) return cgpa(ss);
+  return cgpa(ss.map(sem => {
+    const modCourses = sem.courses.map(c => {
+      const key = `${sem.id}-${c.id}`;
+      if (overrides[key] !== undefined) { const p=overrides[key]; return {...c, pt:p, grade:gfp(p).g}; }
+      return c;
+    });
+    return {...sem, courses:modCourses, sgpa:sgpa(modCourses)};
+  }));
+}
+
+function toggleArrear(key, checked) {
+  if (checked) arrearOverrides[key]=5; else delete arrearOverrides[key];
+  const d=gd(),ss=d.semesters; renderArrearSim(ss,cgpa(ss),ss.reduce((a,s)=>a+s.tc,0));
+}
+function setArrearGrade(key, pt) {
+  arrearOverrides[key]=pt;
+  const d=gd(),ss=d.semesters; renderArrearSim(ss,cgpa(ss),ss.reduce((a,s)=>a+s.tc,0));
+}
+
+// ── Next Semester Planner ──────────────────────────────────────
+function renderSemPlanner(d, ss, curSem, baseCG, baseTC) {
+  const el = document.getElementById('sem-planner');
+  const tsems = d.profile.programme==='mtech'?10:8;
+  const planSemNum = ss.some(s=>s.name===`Semester ${curSem}`) ? curSem+1 : curSem;
+  if (planSemNum > tsems) { el.innerHTML=''; return; }
+
+  const pc = plannedCourses;
+  let projSGPA=null, projCGPA=null, projTC=0;
+  if (pc.length) {
+    projSGPA = sgpa(pc);
+    projTC   = pc.reduce((a,c)=>a+c.credits,0);
+    projCGPA = (baseCG*baseTC + projSGPA*projTC)/(baseTC+projTC);
+  }
+
+  const gradeOpts = GS.map(g=>`<option value="${g.p}">${g.g} — ${g.p} pts (${g.d})</option>`).join('');
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="ct">Semester ${planSemNum} Planner</div>
+      <p style="font-size:13px;color:var(--txm);margin-bottom:14px">
+        Add expected courses to project your SGPA and CGPA for Semester ${planSemNum}.
+      </p>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:2;min-width:150px">
+          <label>Course Name</label>
+          <input type="text" id="plan-cn" placeholder="e.g. VLSI Design">
+        </div>
+        <div>
+          <label>Credits</label>
+          <input type="number" id="plan-cc" min="1" max="6" value="3" style="width:70px">
+        </div>
+        <div>
+          <label>Expected Grade</label>
+          <select id="plan-cg" style="width:auto">${gradeOpts}</select>
+        </div>
+        <button class="btn bp2" onclick="addPlannedCourse()">+ Add</button>
+      </div>
+      ${pc.length ? `
+        <table style="margin-bottom:14px">
+          <thead><tr><th>Course</th><th>Credits</th><th>Expected Grade</th><th>Pts</th><th></th></tr></thead>
+          <tbody>${pc.map(c=>{const g=gfp(c.pt);return`<tr>
+            <td style="font-weight:500">${c.name}</td><td>${c.credits}</td>
+            <td><span style="color:${g.c};font-weight:700">${g.g}</span></td><td>${c.pt}</td>
+            <td><button class="btn bd bsm" onclick="rmPlannedCourse('${c.id}')">×</button></td>
+          </tr>`;}).join('')}</tbody>
+        </table>
+        <div style="padding:16px;background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:var(--rs);display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Projected SGPA (Sem ${planSemNum})</div>
+            <div style="font-size:30px;font-weight:800;color:${cc(projSGPA)}">${projSGPA.toFixed(2)}</div>
+          </div>
+          <div style="font-size:20px;color:var(--txd)">→</div>
+          <div>
+            <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Projected CGPA</div>
+            <div style="font-size:30px;font-weight:800;color:${cc(projCGPA)}">${projCGPA.toFixed(2)}</div>
+            <div style="margin-top:5px"><span class="bdg ${classify(projCGPA,false).b}">${classify(projCGPA,false).l}</span></div>
+          </div>
+        </div>
+        <button class="btn bs bsm" onclick="clearPlannedCourses()">Clear Plan</button>
+      ` : '<p style="font-size:13px;color:var(--txm)">Add expected courses above to see your projected CGPA.</p>'}
+    </div>`;
+}
+
+function addPlannedCourse() {
+  const name = document.getElementById('plan-cn')?.value.trim();
+  const cred = parseInt(document.getElementById('plan-cc')?.value);
+  const pt   = parseInt(document.getElementById('plan-cg')?.value);
+  if (!name)           { toast('Enter course name','err'); return; }
+  if (!cred || cred<1) { toast('Invalid credits','err'); return; }
+  plannedCourses.push({id:Date.now().toString(), name, credits:cred, pt, grade:gfp(pt).g});
+  const d=gd(); d.plannedCourses=plannedCourses; sd(d);
+  document.getElementById('plan-cn').value='';
+  renderPred();
+}
+function rmPlannedCourse(id) {
+  plannedCourses=plannedCourses.filter(c=>c.id!==id);
+  const d=gd(); d.plannedCourses=plannedCourses; sd(d); renderPred();
+}
+function clearPlannedCourses() {
+  plannedCourses=[];
+  const d=gd(); d.plannedCourses=[]; sd(d); renderPred();
+}
+
+// ── Target CGPA Section ────────────────────────────────────────
 function computePred() {
   const d = gd(), ss = d.semesters; if (!ss.length) return;
-  const cg = cgpa(ss), tc = ss.reduce((a,s) => a+s.tc, 0);
-  const prog = d.profile.programme==='mtech'?225:180;
+  const cg  = cgpa(ss), tc = ss.reduce((a,s)=>a+s.tc,0);
   const tsems = d.profile.programme==='mtech'?10:8;
-  const rem = Math.max(0, tsems-ss.length);
-  const tgt = parseFloat(document.getElementById('tgt-cgpa')?.value || 7.5);
-  const cps = parseInt(document.getElementById('cps')?.value || 22);
+  const curSem = d.profile.currentSem || Math.min(ss.length+1, tsems);
+  const rem  = Math.max(0, tsems-curSem);
+  const tgt  = parseFloat(document.getElementById('tgt-cgpa')?.value||7.5);
+  const cps  = parseInt(document.getElementById('cps')?.value||22);
 
   if (rem === 0) {
-    document.getElementById('pred-res').innerHTML = `<div class="al ai">All semesters done! Final CGPA: <strong>${cg.toFixed(2)}</strong></div>`;
+    document.getElementById('pred-res').innerHTML=`<div class="al ai">All semesters done! Final CGPA: <strong>${cg.toFixed(2)}</strong></div>`;
     return;
   }
-  const remC = rem*cps, needed = (tgt*(tc+remC)-cg*tc)/remC;
-  const nCol  = needed>10?'var(--er)':needed<=7?'var(--ok)':needed<=8.5?'var(--wn)':'var(--er)';
-  const nBdg  = needed>10?'<span class="bdg br">Not achievable</span>':
+  const remC=rem*cps, needed=(tgt*(tc+remC)-cg*tc)/remC;
+  const nCol = needed>10?'var(--er)':needed<=7?'var(--ok)':needed<=8.5?'var(--wn)':'var(--er)';
+  const nBdg = needed>10?'<span class="bdg br">Not achievable</span>':
     needed<=7 ?'<span class="bdg bk">✓ Very achievable</span>':
     needed<=8.5?'<span class="bdg bb">Achievable with effort</span>':
     needed<=9.5?'<span class="bdg bg">Challenging</span>':'<span class="bdg br">Extremely difficult</span>';
 
-  const scenarios = [{t:7.5,l:'First Class with Distinction',b:'bg'},{t:6.0,l:'First Class',b:'bb'},{t:5.0,l:'Second Class',b:'bp'}];
-  const scRows = scenarios.map(sc => {
-    const r  = (sc.t*(tc+remC)-cg*tc)/remC, ok = r<=10;
-    const col = ok?(r<=7?'var(--ok)':r<=8.5?'var(--wn)':'var(--er)'):'var(--er)';
-    return `<tr>
+  const scenarios=[{t:7.5,l:'First Class with Distinction',b:'bg'},{t:6.0,l:'First Class',b:'bb'},{t:5.0,l:'Second Class',b:'bp'}];
+  const scRows=scenarios.map(sc=>{
+    const r=(sc.t*(tc+remC)-cg*tc)/remC, ok=r<=10;
+    const col=ok?(r<=7?'var(--ok)':r<=8.5?'var(--wn)':'var(--er)'):'var(--er)';
+    return`<tr>
       <td><span class="bdg ${sc.b}">${sc.l}</span></td><td>≥ ${sc.t}</td>
       <td style="font-weight:700;color:${col}">${ok?r.toFixed(2)+' avg SGPA':'Not achievable'}</td>
       <td>${!ok?'✗':r<=7?'✓ Easy':r<=8.5?'⚠ Manageable':r<=10?'⚠ Very hard':'✗'}</td>
     </tr>`;
   }).join('');
 
-  const planRows = Array.from({length:rem},(_,i) => {
-    const sc  = tc+(i+1)*cps;
-    const pCG = Math.min((cg*tc+Math.min(needed,10)*(i+1)*cps)/sc, 10);
-    const cls = classify(pCG, false);
-    return `<tr>
-      <td>Semester ${ss.length+i+1}</td>
+  const planRows=Array.from({length:rem},(_,i)=>{
+    const sc=tc+(i+1)*cps;
+    const pCG=Math.min((cg*tc+Math.min(needed,10)*(i+1)*cps)/sc,10);
+    const cls=classify(pCG,false);
+    return`<tr>
+      <td>Semester ${curSem+i+1}</td>
       <td style="font-weight:700;color:${needed>10?'var(--er)':nCol}">${Math.min(needed,10).toFixed(2)}</td>
       <td style="font-weight:700">${pCG.toFixed(2)}</td>
       <td><span class="bdg ${cls.b}">${cls.l}</span></td>
     </tr>`;
   }).join('');
 
-  document.getElementById('pred-res').innerHTML = `
+  document.getElementById('pred-res').innerHTML=`
     <div class="card">
-      <div class="ct">Required for CGPA ${tgt}</div>
+      <div class="ct">Required for CGPA ${tgt} — ${rem} semesters left</div>
       ${needed>10
-        ? `<div class="al ae">❌ CGPA ${tgt} is <strong>mathematically impossible</strong> — would need ${needed.toFixed(2)} avg SGPA (max is 10) across ${rem} semesters at ${cps} credits each.</div>`
-        : `<div style="text-align:center;padding:16px 0">
+        ?`<div class="al ae">❌ CGPA ${tgt} is <strong>mathematically impossible</strong> — would need ${needed.toFixed(2)} avg SGPA across ${rem} remaining sems at ${cps} credits each.</div>`
+        :`<div style="text-align:center;padding:16px 0">
             <div style="font-size:11px;color:var(--txd);text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px">Average SGPA Needed</div>
             <div style="font-size:62px;font-weight:900;letter-spacing:-2px;color:${nCol}">${needed.toFixed(2)}</div>
             <div style="color:var(--txm);font-size:12px;margin-top:6px">across ${rem} remaining semester(s) at ${cps} credits/sem</div>
