@@ -1208,6 +1208,7 @@ function delTmplById(id) {
 // ════════════════════════════════════════════════════════════════════
 let courses = [];
 let editingSemId = null;
+let editingCourseId = null;
 
 function loadSemForEdit(id) {
   const d = gd(), sem = d.semesters.find(s => s.id === id);
@@ -1294,12 +1295,50 @@ function renderCourseList() {
   el.innerHTML = `
     <table>
       <thead><tr><th>Course</th><th>Credits</th><th>Grade</th><th>Pts</th><th>Marks</th><th></th></tr></thead>
-      <tbody>${courses.map(c => { const g=gfp(c.pt); return `<tr>
-        <td style="font-weight:500">${c.name}</td><td>${c.credits}</td>
-        <td><span style="color:${g.c};font-weight:700">${c.grade}</span></td>
-        <td>${c.pt}</td><td>${c.marks!=null?c.marks+'/100':'—'}</td>
-        <td><button class="btn bd bsm" onclick="rmCourse('${c.id}')">×</button></td>
-      </tr>`}).join('')}</tbody>
+      <tbody>${courses.map(c => {
+        const g = gfp(c.pt);
+        if (editingCourseId === c.id) {
+          const gradeOpts = GS.map(gs => `<option value="${gs.p}" ${c.pt===gs.p?'selected':''}>${gs.g} — ${gs.p} pts</option>`).join('');
+          return `<tr style="background:rgba(99,102,241,.07)">
+            <td><input type="text" id="ec-name" value="${c.name}" style="font-size:12px;padding:5px 8px;width:100%"></td>
+            <td><input type="number" id="ec-cred" value="${c.credits}" min="1" max="6" style="font-size:12px;padding:5px 8px;width:60px"></td>
+            <td colspan="3">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <select id="ec-mode" onchange="toggleEditMode()" style="font-size:12px;padding:5px 8px;width:auto">
+                  <option value="marks" ${c.marks!=null?'selected':''}>Marks (/100)</option>
+                  <option value="grade" ${c.marks==null?'selected':''}>Grade</option>
+                </select>
+                <div id="ec-marks-area" style="${c.marks!=null?'display:flex;align-items:center;gap:8px':'display:none'}">
+                  <input type="number" id="ec-marks" value="${c.marks!=null?c.marks:''}" min="0" max="100" step=".5" style="font-size:12px;padding:5px 8px;width:75px" oninput="previewEditGrade()">
+                  <span id="ec-grade-preview" style="font-size:12px"></span>
+                </div>
+                <div id="ec-grade-area" style="${c.marks==null?'':'display:none'}">
+                  <select id="ec-grade" style="font-size:12px;padding:5px 8px;width:auto">${gradeOpts}</select>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div style="display:flex;gap:5px">
+                <button class="btn bp2 bsm" onclick="saveEditCourse('${c.id}')">✓</button>
+                <button class="btn bs bsm" onclick="cancelEditCourse()">✕</button>
+              </div>
+            </td>
+          </tr>`;
+        }
+        return `<tr>
+          <td style="font-weight:500">${c.name}</td>
+          <td>${c.credits}</td>
+          <td><span style="color:${g.c};font-weight:700">${c.grade}</span></td>
+          <td>${c.pt}</td>
+          <td>${c.marks!=null?c.marks+'/100':'—'}</td>
+          <td>
+            <div style="display:flex;gap:5px">
+              <button class="btn bs bsm" onclick="startEditCourse('${c.id}')">✎</button>
+              <button class="btn bd bsm" onclick="rmCourse('${c.id}')">×</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
     </table>`;
   const s   = sgpa(courses), tc = courses.reduce((a,c) => a+c.credits, 0);
   const cls = classify(s, courses.some(c => c.pt === 0));
@@ -1315,6 +1354,53 @@ function renderCourseList() {
       </div>
       <span class="bdg ${cls.b}">${cls.l}</span>
     </div>`;
+}
+
+function startEditCourse(id) {
+  editingCourseId = id;
+  renderCourseList();
+  previewEditGrade();
+}
+
+function cancelEditCourse() {
+  editingCourseId = null;
+  renderCourseList();
+}
+
+function toggleEditMode() {
+  const mode = document.getElementById('ec-mode').value;
+  document.getElementById('ec-marks-area').style.display = mode==='marks' ? 'flex' : 'none';
+  document.getElementById('ec-grade-area').style.display = mode==='grade' ? ''    : 'none';
+}
+
+function previewEditGrade() {
+  const v  = parseFloat(document.getElementById('ec-marks')?.value);
+  const el = document.getElementById('ec-grade-preview');
+  if (!el) return;
+  if (isNaN(v)) { el.textContent=''; return; }
+  const g = gfm(Math.min(v, 100));
+  el.innerHTML = `→ <span style="color:${g.c};font-weight:700">${g.g}</span> (${g.p} pts)`;
+}
+
+function saveEditCourse(id) {
+  const name = document.getElementById('ec-name')?.value.trim();
+  const cred = parseInt(document.getElementById('ec-cred')?.value);
+  const mode = document.getElementById('ec-mode')?.value;
+  if (!name)           { toast('Course name required','err'); return; }
+  if (!cred || cred<1) { toast('Invalid credits','err'); return; }
+  let pt, marks=null, grade;
+  if (mode === 'marks') {
+    marks = parseFloat(document.getElementById('ec-marks')?.value);
+    if (isNaN(marks)||marks<0||marks>100) { toast('Enter valid marks (0–100)','err'); return; }
+    const g = gfm(marks); pt=g.p; grade=g.g;
+  } else {
+    pt = parseInt(document.getElementById('ec-grade')?.value); grade=gfp(pt).g;
+  }
+  const idx = courses.findIndex(c => c.id === id);
+  if (idx >= 0) courses[idx] = {...courses[idx], name, credits:cred, pt, marks, grade};
+  editingCourseId = null;
+  renderCourseList();
+  toast('Course updated');
 }
 
 function saveSem() {
