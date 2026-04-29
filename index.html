@@ -1429,6 +1429,7 @@ function clearSem() { courses=[]; renderCourseList(); }
 // ════════════════════════════════════════════════════════════════════
 let plannedCourses = [];
 let arrearOverrides = {}; // key: `${semId}-${courseId}` → gradePoint override
+let arrearCIA = {};       // key: `${semId}-${courseId}` → CIA marks entered
 
 function renderPred() {
   const d   = gd(), ss = d.semesters, cg = cgpa(ss);
@@ -1480,6 +1481,9 @@ function saveCurrentSem(val) {
 // ── Arrear Clearance Simulator ─────────────────────────────────
 function renderArrearSim(ss, baseCG, baseTC) {
   const el = document.getElementById('arrear-sim');
+  const d  = gd();
+  arrearCIA = d.arrearCIA || {};
+
   const arrears = [];
   ss.forEach(sem => sem.courses.forEach(c => {
     if (c.pt === 0) arrears.push({semId:sem.id, semName:sem.name, courseId:c.id, courseName:c.name, credits:c.credits});
@@ -1494,28 +1498,44 @@ function renderArrearSim(ss, baseCG, baseTC) {
   el.innerHTML = `
     <div class="card">
       <div class="ct">Arrear Clearance Simulator</div>
-      <p style="font-size:13px;color:var(--txm);margin-bottom:14px">
-        You have <strong style="color:var(--er)">${arrears.length} arrear(s)</strong>.
-        Toggle each to simulate clearing it and see the impact on your CGPA.
-      </p>
-      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px">
+      <div class="al ai" style="margin-bottom:14px">
+        ℹ <strong>SASTRA rule:</strong> CIA marks below 25/50 are automatically raised to 25 for your arrear attempt.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
         ${arrears.map(a => {
-          const key = `${a.semId}-${a.courseId}`;
-          const on  = arrearOverrides[key] !== undefined;
-          const gpt = arrearOverrides[key] || 5;
+          const key     = `${a.semId}-${a.courseId}`;
+          const on      = arrearOverrides[key] !== undefined;
+          const gpt     = arrearOverrides[key] || 5;
+          const entered = arrearCIA[key];
           const gradeOpts = GS.filter(g=>g.p>0).map(g=>`<option value="${g.p}" ${gpt===g.p?'selected':''}>${g.g} — ${g.p} pts</option>`).join('');
           return `
-            <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:${on?'rgba(34,197,94,.06)':'rgba(255,255,255,.03)'};border:1px solid ${on?'rgba(34,197,94,.3)':'var(--bdr)'};border-radius:var(--rs);flex-wrap:wrap;transition:all .2s">
-              <input type="checkbox" ${on?'checked':''} style="width:16px;height:16px;accent-color:var(--ok);cursor:pointer;flex-shrink:0"
-                onchange="toggleArrear('${key}',this.checked)">
-              <div style="flex:1;min-width:100px">
-                <div style="font-size:13px;font-weight:600">${a.courseName}</div>
-                <div style="font-size:11px;color:var(--txm)">${a.semName} · ${a.credits} cr</div>
+            <div style="background:${on?'rgba(34,197,94,.04)':'rgba(255,255,255,.025)'};border:1px solid ${on?'rgba(34,197,94,.25)':'var(--bdr)'};border-radius:var(--r);padding:14px;transition:all .2s">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+                <input type="checkbox" ${on?'checked':''} style="width:16px;height:16px;accent-color:var(--ok);cursor:pointer;flex-shrink:0"
+                  onchange="toggleArrear('${key}',this.checked)">
+                <div style="flex:1;min-width:120px">
+                  <div style="font-size:13px;font-weight:600">${a.courseName}</div>
+                  <div style="font-size:11px;color:var(--txm)">${a.semName} · ${a.credits} credits</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;${on?'':'opacity:.35;pointer-events:none'}">
+                  <span style="font-size:12px;color:var(--er);font-weight:700">F →</span>
+                  <select style="font-size:12px;padding:5px 8px;width:auto" ${on?'':'disabled'}
+                    onchange="setArrearGrade('${key}',parseInt(this.value))">${gradeOpts}</select>
+                </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;${on?'':'opacity:.35;pointer-events:none'}">
-                <span style="font-size:12px;color:var(--er);font-weight:700">F →</span>
-                <select style="font-size:12px;padding:5px 8px;width:auto" ${on?'':'disabled'}
-                  onchange="setArrearGrade('${key}',parseInt(this.value))">${gradeOpts}</select>
+              <div style="background:rgba(0,0,0,.2);border-radius:var(--rs);padding:12px">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                  <div>
+                    <label style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">CIA Marks (out of 50)</label>
+                    <input type="number" min="0" max="50" step=".5" placeholder="0–50"
+                      value="${entered !== undefined ? entered : ''}"
+                      style="width:80px;font-size:14px;font-weight:700;padding:7px 10px;background:var(--bg2)"
+                      oninput="updateArrearCIA('${key}',this.value)">
+                  </div>
+                  <div id="cia-disp-${key}" style="flex:1;min-width:180px">
+                    ${entered !== undefined ? ciaPillsHTML(entered) : '<span style="font-size:12px;color:var(--txd)">Enter CIA marks to see End Sem requirements</span>'}
+                  </div>
+                </div>
               </div>
             </div>`;
         }).join('')}
@@ -1528,16 +1548,61 @@ function renderArrearSim(ss, baseCG, baseTC) {
           </div>
           <div style="font-size:22px;color:var(--txd)">→</div>
           <div>
-            <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Simulated CGPA</div>
+            <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">If toggled arrears cleared</div>
             <div style="font-size:30px;font-weight:800;color:${cc(simCG)}">${simCG.toFixed(2)}</div>
           </div>
           <div>
             <span class="bdg ${diff>0?'bk':diff<0?'br':'bn'}">${diff>0?'▲ +':'▼ '}${Math.abs(diff).toFixed(2)} pts</span>
-            ${diff>0?`<div style="font-size:11px;color:var(--ok);margin-top:5px">Clearing these arrears boosts your CGPA</div>`:''}
-            ${simCG>=7.5&&baseCG<7.5?`<div style="font-size:11px;color:var(--ok);margin-top:3px">🎉 Distinction becomes achievable!</div>`:''}
+            ${simCG>=7.5&&baseCG<7.5?`<div style="font-size:11px;color:var(--ok);margin-top:5px">🎉 Distinction becomes achievable!</div>`:''}
           </div>
         </div>` : ''}
     </div>`;
+}
+
+// Build the "effective CIA + End Sem needed" display HTML
+function ciaPillsHTML(entered) {
+  const effective = Math.max(parseFloat(entered), 25);
+  const applied   = parseFloat(entered) < 25;
+  const pills = GS.filter(g=>g.p>0).map(g => {
+    const need = g.min - effective;
+    if (need > 50) return `<span style="color:var(--txd);font-size:11px;opacity:.6">${g.g}: —</span>`;
+    if (need <= 0) return `<span style="background:var(--oka);color:var(--ok);padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600">${g.g} ✓</span>`;
+    const col = need<=25?'var(--ok)':need<=40?'var(--wn)':'var(--er)';
+    return `<span style="background:rgba(255,255,255,.05);padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600"><span style="color:${g.c}">${g.g}</span>: <span style="color:${col}">${Math.ceil(need)}/50</span></span>`;
+  }).join('');
+  return `
+    <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Effective CIA</div>
+        <div style="font-size:20px;font-weight:800;color:${applied?'var(--wn)':'var(--ok)'}">
+          ${effective}/50
+          ${applied?`<span style="font-size:10px;color:var(--wn);font-weight:400;margin-left:5px">↑ raised to 25</span>`:''}
+        </div>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:10px;color:var(--txd);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">End Sem needed for each grade</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${pills}</div>
+      </div>
+    </div>`;
+}
+
+// Called on every keystroke — only updates the display div, no re-render (preserves input focus)
+function updateArrearCIA(key, val) {
+  const d = gd();
+  if (!d.arrearCIA) d.arrearCIA = {};
+  const num = parseFloat(val);
+  const disp = document.getElementById('cia-disp-'+key);
+  if (val==='' || isNaN(num)) {
+    delete d.arrearCIA[key];
+    delete arrearCIA[key];
+    if (disp) disp.innerHTML = '<span style="font-size:12px;color:var(--txd)">Enter CIA marks to see End Sem requirements</span>';
+  } else {
+    const v = Math.min(Math.max(num, 0), 50);
+    d.arrearCIA[key] = v;
+    arrearCIA[key]   = v;
+    if (disp) disp.innerHTML = ciaPillsHTML(v);
+  }
+  sd(d);
 }
 
 function computeSimCGPA(ss, overrides) {
