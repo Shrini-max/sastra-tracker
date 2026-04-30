@@ -11,6 +11,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 <style>
 /* ── Design Tokens ──────────────────────────────────────────────── */
 :root{
@@ -198,7 +202,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h2 style="font-size:16px;font-weight:700" id="modal-title">New Subject Template</h2>
-      <button class="btn bs bsm" onclick="closeModal()">✕ Close</button>
+      <button class="btn bs bsm" onclick="closeModal()">�� Close</button>
     </div>
     <div id="tmpl-editor"></div>
     <div style="display:flex;gap:10px;margin-top:18px">
@@ -210,7 +214,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 
 <div class="app">
 
-  <!-- ── Sidebar ────────────────────────────────────────────────── -->
+  <!-- ── Sidebar ────────────────��───────────────────────────────── -->
   <aside class="sidebar">
     <div class="sb-logo">
       <div class="sb-logo-title">🎓 SASTRA Tracker</div>
@@ -534,7 +538,7 @@ const sd  = d => {
   syncToCloud(d);
 };
 
-// ── Cloud Sync ────────────────────────────────────────────────────
+// ���─ Cloud Sync ────────────────────────────────────────────────────
 function setSyncSt(state) {
   syncSt = state;
   const dot = document.getElementById('sync-dot');
