@@ -165,6 +165,9 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 /* ── Toast ──────────────────────────────────────────────────────── */
 .toast{position:fixed;bottom:22px;right:22px;background:rgba(12,23,40,.96);border:1px solid var(--bdr2);border-radius:10px;padding:11px 17px;font-size:13px;font-weight:600;z-index:999;transform:translateY(70px);opacity:0;transition:all .28s var(--ease);pointer-events:none;backdrop-filter:blur(20px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
 .toast.show{transform:translateY(0);opacity:1}
+.toast.show.sticky{pointer-events:auto;cursor:default}
+.toast-close{background:none;border:none;color:inherit;cursor:pointer;font-size:15px;font-weight:700;margin-left:10px;padding:0;vertical-align:middle;opacity:.7}
+.toast-close:hover{opacity:1}
 
 /* ── Tabs ───────────────────────────────────────────────────────── */
 .tab{display:none}.tab.on{display:block}
@@ -513,6 +516,7 @@ const GS = [
 const gfm = m => GS.find(x => m >= x.min) || GS[GS.length-1];
 const gfp = p => GS.find(x => x.p === p)  || GS[GS.length-1];
 const cc  = v => v>=8.5?'#a78bfa':v>=7.5?'#60a5fa':v>=6.5?'#34d399':v>=6?'#facc15':v>=5?'#fb923c':'#f87171';
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function classify(cgpa, arr) {
   if (cgpa >= 7.5 && !arr) return {l:'First Class with Distinction', b:'bg'};
@@ -551,6 +555,7 @@ async function syncToCloud(data) {
     setSyncSt('online');
   } catch(e) {
     setSyncSt('offline');
+    toast('Cloud sync failed — data saved locally', 'warn');
     console.warn('Sync failed:', e);
   }
 }
@@ -572,6 +577,7 @@ async function loadCloud() {
     }
   } catch(e) {
     setSyncSt('offline');
+    toast('Failed to load cloud data — using local copy', 'warn');
     console.warn('Load cloud failed:', e);
   }
 }
@@ -606,8 +612,8 @@ function renderUserArea() {
   if (!FB_ON) {
     el.innerHTML = `
       <div class="sb-user-row">
-        <div class="avatar">${name[0].toUpperCase()}</div>
-        <div><div class="user-name">${name}</div><div class="user-sub">Offline mode</div></div>
+        <div class="avatar">${esc(name[0].toUpperCase())}</div>
+        <div><div class="user-name">${esc(name)}</div><div class="user-sub">Offline mode</div></div>
         <div class="sync-dot off" id="sync-dot"></div>
       </div>`;
   } else if (!currentUser) {
@@ -628,7 +634,7 @@ function renderUserArea() {
       <div class="sb-user-row">
         <div class="avatar">${photoHtml}</div>
         <div style="flex:1;min-width:0">
-          <div class="user-name">${u.displayName || u.email}</div>
+          <div class="user-name">${esc(u.displayName || u.email)}</div>
           <div class="user-sub">${syncSt==='online'?'Synced':'Syncing…'}</div>
         </div>
         <div class="sync-dot ${syncSt==='online'?'':'ing'}" id="sync-dot"></div>
@@ -668,7 +674,7 @@ function renderSyncCard() {
     const u = currentUser;
     el.innerHTML = `
       <div class="ct">Cloud Sync</div>
-      <div class="al as" style="margin-bottom:12px">✓ Signed in as <strong>${u.displayName || u.email}</strong> — data syncs automatically.</div>
+      <div class="al as" style="margin-bottom:12px">✓ Signed in as <strong>${esc(u.displayName || u.email)}</strong> — data syncs automatically.</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button class="btn bs" onclick="loadCloud()">↓ Pull from Cloud</button>
         <button class="btn bs" onclick="syncToCloud(gd())">↑ Push to Cloud</button>
@@ -719,11 +725,24 @@ function getTmpls() {
 let toastTimer;
 function toast(msg, type='ok') {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.style.borderColor = type==='err'?'var(--er)':type==='warn'?'var(--wn)':'var(--ok)';
-  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2700);
+  el.classList.remove('show', 'sticky');
+  el.style.borderColor = type==='err'?'var(--er)':type==='warn'?'var(--wn)':'var(--ok)';
+
+  if (type === 'err') {
+    // Errors stay until the user dismisses them
+    el.innerHTML = '';
+    const span = document.createElement('span'); span.textContent = msg; el.appendChild(span);
+    const btn = document.createElement('button');
+    btn.className = 'toast-close'; btn.textContent = '×';
+    btn.onclick = () => el.classList.remove('show', 'sticky');
+    el.appendChild(btn);
+    el.classList.add('show', 'sticky');
+  } else {
+    el.textContent = msg;
+    el.classList.add('show');
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2700);
+  }
 }
 
 // ── GPA Calculation ───────────────────────────────────────────────
@@ -764,7 +783,7 @@ function renderDash() {
 
   if (!ss.length) {
     document.getElementById('dash').innerHTML = `
-      <div class="al ai">👋 Welcome, <strong>${name}</strong>! Add your semester data to get started.</div>
+      <div class="al ai">👋 Welcome, <strong>${esc(name)}</strong>! Add your semester data to get started.</div>
       <div class="card" style="text-align:center;padding:56px 24px">
         <div style="font-size:56px;margin-bottom:18px;opacity:.65">🎓</div>
         <div style="font-size:19px;font-weight:800;margin-bottom:8px">No data yet</div>
@@ -790,7 +809,7 @@ function renderDash() {
         <div class="mcard-accent" style="background:linear-gradient(90deg,#818cf8,#60a5fa)"></div>
         <div class="mcard-label">Last SGPA</div>
         <div class="mcard-val" style="color:${cc(last.sgpa)}">${last.sgpa.toFixed(2)}</div>
-        <div class="mcard-sub">${last.name}</div>
+        <div class="mcard-sub">${esc(last.name)}</div>
       </div>
       <div class="mcard">
         <div class="mcard-accent" style="background:linear-gradient(90deg,#34d399,#22c55e)"></div>
@@ -821,7 +840,7 @@ function renderDash() {
         <tbody>
           ${ss.map((s,i) => `
             <tr>
-              <td style="font-weight:600">${s.name}</td>
+              <td style="font-weight:600">${esc(s.name)}</td>
               <td>${s.courses.length}</td>
               <td>${s.tc}</td>
               <td><span style="font-weight:700;color:${cc(s.sgpa)}">${s.sgpa.toFixed(2)}</span></td>
@@ -842,7 +861,7 @@ function renderDash() {
                     <tbody>${s.courses.map(c => {
                       const g = gfp(c.pt);
                       return `<tr>
-                        <td>${c.name}</td><td>${c.credits}</td>
+                        <td>${esc(c.name)}</td><td>${c.credits}</td>
                         <td><span style="color:${g.c};font-weight:700">${c.grade}</span></td>
                         <td>${c.pt}</td><td>${c.marks!=null?c.marks+'/100':'—'}</td>
                       </tr>`;
@@ -908,12 +927,12 @@ function renderInternals() {
   curTmplId = tmpl.id;
 
   const sel = document.getElementById('tmpl-sel');
-  sel.innerHTML = tmpls.map(t => `<option value="${t.id}" ${t.id===curTmplId?'selected':''}>${t.name}${t.isDefault?' ★':''}</option>`).join('');
+  sel.innerHTML = tmpls.map(t => `<option value="${t.id}" ${t.id===curTmplId?'selected':''}>${esc(t.name)}${t.isDefault?' ★':''}</option>`).join('');
 
   const totalCIA = tmpl.components.reduce((a,c) => a+(c.ciaMarks||0), 0);
   document.getElementById('tmpl-desc').innerHTML =
     `${tmpl.components.length} component(s) · CIA total: ${totalCIA}/50 · ` +
-    tmpl.components.map(c => `${c.name} (${c.ciaMarks} marks${c.bestOf?`, best ${c.bestOf} of ${c.entries.length}`:''})`).join(' · ');
+    tmpl.components.map(c => `${esc(c.name)} (${c.ciaMarks} marks${c.bestOf?`, best ${c.bestOf} of ${c.entries.length}`:''})`).join(' · ');
 
   document.getElementById('edit-tmpl-btn').disabled = false;
   document.getElementById('del-tmpl-btn').disabled  = !!tmpl.isDefault;
@@ -935,7 +954,7 @@ function renderCIAInputs(tmpl) {
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
           <div>
-            <div style="font-weight:700;font-size:14px;margin-bottom:3px">${comp.name}</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:3px">${esc(comp.name)}</div>
             <div style="font-size:11.5px;color:var(--txm)">
               ${hasBestOf?`Best <strong style="color:var(--prl)">${comp.bestOf}</strong> of ${comp.entries.length} counted · `:'All entries counted · '}
               Contributes <strong style="color:var(--prl)">${comp.ciaMarks}</strong> CIA marks
@@ -947,7 +966,7 @@ function renderCIAInputs(tmpl) {
           ${comp.entries.map((e,ei) => `
             <div class="ebox" id="eb-${ci}-${ei}" style="min-width:120px;flex:1">
               <div class="etag" id="et-${ci}-${ei}"></div>
-              <div style="font-size:11px;color:var(--txm);font-weight:600;margin-bottom:8px">${e.label}</div>
+              <div style="font-size:11px;color:var(--txm);font-weight:600;margin-bottom:8px">${esc(e.label)}</div>
               <input type="number" min="0" max="${e.max}" step=".5" placeholder="0–${e.max}"
                 id="ei-${ci}-${ei}"
                 style="text-align:center;font-size:16px;font-weight:700;background:var(--bg2)"
@@ -1110,7 +1129,7 @@ function renderTmplEditor() {
     </div>
     <div class="fg">
       <label>Template Name *</label>
-      <input type="text" id="te-name" value="${eTmpl.name}" placeholder="e.g. EC Theory + Lab" oninput="eTmpl.name=this.value">
+      <input type="text" id="te-name" value="${esc(eTmpl.name)}" placeholder="e.g. EC Theory + Lab" oninput="eTmpl.name=this.value">
     </div>
     ${eTmpl.components.map((comp,ci) => `
       <div style="background:var(--sur2);border-radius:var(--rs);padding:14px;margin-bottom:10px">
@@ -1121,7 +1140,7 @@ function renderTmplEditor() {
         <div class="g2" style="margin-bottom:10px">
           <div class="fg" style="margin-bottom:0">
             <label>Name</label>
-            <input type="text" value="${comp.name}" placeholder="e.g. Lab Work" oninput="eTmpl.components[${ci}].name=this.value">
+            <input type="text" value="${esc(comp.name)}" placeholder="e.g. Lab Work" oninput="eTmpl.components[${ci}].name=this.value">
           </div>
           <div class="fg" style="margin-bottom:0">
             <label>CIA Marks contributed (must sum to 50)</label>
@@ -1135,7 +1154,7 @@ function renderTmplEditor() {
         <div style="font-size:10.5px;color:var(--txd);font-weight:700;margin-bottom:7px;text-transform:uppercase;letter-spacing:.07em">Entries (inputs the user fills in)</div>
         ${comp.entries.map((e,ei) => `
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
-            <input type="text" value="${e.label}" placeholder="Label" oninput="eTmpl.components[${ci}].entries[${ei}].label=this.value" style="flex:2">
+            <input type="text" value="${esc(e.label)}" placeholder="Label" oninput="eTmpl.components[${ci}].entries[${ei}].label=this.value" style="flex:2">
             <span style="color:var(--txm);font-size:12px;white-space:nowrap">out of</span>
             <input type="number" min="1" value="${e.max}" oninput="eTmpl.components[${ci}].entries[${ei}].max=parseFloat(this.value)||50" style="flex:1;max-width:80px">
             ${comp.entries.length>1?`<button class="btn bd bsm" onclick="rmEntry(${ci},${ei})">×</button>`:'<span style="width:36px"></span>'}
@@ -1187,8 +1206,8 @@ function renderTmplSettings() {
     <table>
       <thead><tr><th>Template</th><th>Components</th><th>Type</th><th></th></tr></thead>
       <tbody>${tmpls.map(t => `<tr>
-        <td style="font-weight:600">${t.name}</td>
-        <td style="font-size:12px;color:var(--txm)">${t.components.map(c=>`${c.name} (${c.ciaMarks}m)`).join(', ')}</td>
+        <td style="font-weight:600">${esc(t.name)}</td>
+        <td style="font-size:12px;color:var(--txm)">${t.components.map(c=>`${esc(c.name)} (${c.ciaMarks}m)`).join(', ')}</td>
         <td>${t.isDefault?'<span class="bdg bn">Built-in</span>':'<span class="bdg bk">Custom</span>'}</td>
         <td>${!t.isDefault?`<button class="btn bd bsm" onclick="delTmplById('${t.id}')">Delete</button>`:'—'}</td>
       </tr>`).join('')}</tbody>
@@ -1234,7 +1253,7 @@ function renderEditBanner() {
   banner.id = 'edit-banner';
   banner.className = 'al aw';
   banner.style.marginBottom = '14px';
-  banner.innerHTML = `✎ Editing <strong>${sem.name}</strong> — modify courses below, then click Save Semester.
+  banner.innerHTML = `✎ Editing <strong>${esc(sem.name)}</strong> — modify courses below, then click Save Semester.
     <button class="btn bs bsm" style="margin-left:10px;vertical-align:middle" onclick="cancelEdit()">Cancel</button>`;
   const semTab = document.getElementById('tab-semester');
   semTab.insertBefore(banner, semTab.querySelector('.card'));
@@ -1302,7 +1321,7 @@ function renderCourseList() {
         if (editingCourseId === c.id) {
           const gradeOpts = GS.map(gs => `<option value="${gs.p}" ${c.pt===gs.p?'selected':''}>${gs.g} — ${gs.p} pts</option>`).join('');
           return `<tr style="background:rgba(99,102,241,.07)">
-            <td><input type="text" id="ec-name" value="${c.name}" style="font-size:12px;padding:5px 8px;width:100%"></td>
+            <td><input type="text" id="ec-name" value="${esc(c.name)}" style="font-size:12px;padding:5px 8px;width:100%"></td>
             <td><input type="number" id="ec-cred" value="${c.credits}" min="1" max="6" style="font-size:12px;padding:5px 8px;width:60px"></td>
             <td colspan="3">
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1328,7 +1347,7 @@ function renderCourseList() {
           </tr>`;
         }
         return `<tr>
-          <td style="font-weight:500">${c.name}</td>
+          <td style="font-weight:500">${esc(c.name)}</td>
           <td>${c.credits}</td>
           <td><span style="color:${g.c};font-weight:700">${c.grade}</span></td>
           <td>${c.pt}</td>
@@ -1438,7 +1457,8 @@ function renderPred() {
   const curSem = d.profile.currentSem || Math.min(ss.length+1, tsems);
   const rem  = Math.max(0, tsems - curSem);
 
-  plannedCourses = d.plannedCourses || [];
+  plannedCourses  = d.plannedCourses  || [];
+  arrearOverrides = d.arrearOverrides || {};
 
   if (!ss.length) {
     document.getElementById('pred-cur').innerHTML   = '<p style="color:var(--txm)">No semester data yet.</p>';
@@ -1514,8 +1534,8 @@ function renderArrearSim(ss, baseCG, baseTC) {
                 <input type="checkbox" ${on?'checked':''} style="width:16px;height:16px;accent-color:var(--ok);cursor:pointer;flex-shrink:0"
                   onchange="toggleArrear('${key}',this.checked)">
                 <div style="flex:1;min-width:120px">
-                  <div style="font-size:13px;font-weight:600">${a.courseName}</div>
-                  <div style="font-size:11px;color:var(--txm)">${a.semName} · ${a.credits} credits</div>
+                  <div style="font-size:13px;font-weight:600">${esc(a.courseName)}</div>
+                  <div style="font-size:11px;color:var(--txm)">${esc(a.semName)} · ${a.credits} credits</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;${on?'':'opacity:.35;pointer-events:none'}">
                   <span style="font-size:12px;color:var(--er);font-weight:700">F →</span>
@@ -1619,11 +1639,13 @@ function computeSimCGPA(ss, overrides) {
 
 function toggleArrear(key, checked) {
   if (checked) arrearOverrides[key]=5; else delete arrearOverrides[key];
-  const d=gd(),ss=d.semesters; renderArrearSim(ss,cgpa(ss),ss.reduce((a,s)=>a+s.tc,0));
+  const d=gd(); d.arrearOverrides=arrearOverrides; sd(d);
+  const ss=d.semesters; renderArrearSim(ss,cgpa(ss),ss.reduce((a,s)=>a+s.tc,0));
 }
 function setArrearGrade(key, pt) {
   arrearOverrides[key]=pt;
-  const d=gd(),ss=d.semesters; renderArrearSim(ss,cgpa(ss),ss.reduce((a,s)=>a+s.tc,0));
+  const d=gd(); d.arrearOverrides=arrearOverrides; sd(d);
+  const ss=d.semesters; renderArrearSim(ss,cgpa(ss),ss.reduce((a,s)=>a+s.tc,0));
 }
 
 // ── Next Semester Planner ──────────────────────────────────────
@@ -1668,7 +1690,7 @@ function renderSemPlanner(d, ss, curSem, baseCG, baseTC) {
         <table style="margin-bottom:14px">
           <thead><tr><th>Course</th><th>Credits</th><th>Expected Grade</th><th>Pts</th><th></th></tr></thead>
           <tbody>${pc.map(c=>{const g=gfp(c.pt);return`<tr>
-            <td style="font-weight:500">${c.name}</td><td>${c.credits}</td>
+            <td style="font-weight:500">${esc(c.name)}</td><td>${c.credits}</td>
             <td><span style="color:${g.c};font-weight:700">${g.g}</span></td><td>${c.pt}</td>
             <td><button class="btn bd bsm" onclick="rmPlannedCourse('${c.id}')">×</button></td>
           </tr>`;}).join('')}</tbody>
