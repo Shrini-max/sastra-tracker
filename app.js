@@ -1,45 +1,4 @@
-// ════════════════════════════════════════════════════════════════════
-// FIREBASE CONFIG
-// ════════════════════════════════════════════════════════════════════
-// To enable online sync:
-//   1. Go to https://console.firebase.google.com → Add project → name it "sastra-tracker"
-//   2. Click Web icon (</>), register app, copy the firebaseConfig object below
-//   3. Enable Google sign-in: Authentication → Sign-in method → Google → Enable
-//   4. Create Firestore: Firestore Database → Create → Start in test mode
-//   5. Add your Vercel domain to Authentication → Settings → Authorized domains
-//   6. Firestore security rules to paste:
-//      rules_version = '2';
-//      service cloud.firestore {
-//        match /databases/{database}/documents {
-//          match /users/{uid}/data/{doc=**} {
-//            allow read, write: if request.auth != null && request.auth.uid == uid;
-//          }
-//        }
-//      }
-const FB_CFG = {
-  apiKey: "AIzaSyAvjCGKwGIEKAs4COJZFmhBJpLYHUe67YQ",
-  authDomain: "sastra-tracker.firebaseapp.com",
-  projectId: "sastra-tracker",
-  storageBucket: "sastra-tracker.firebasestorage.app",
-  messagingSenderId: "147104906938",
-  appId: "1:147104906938:web:b562b6b6f81639b390cc83"
-};
-// ════════════════════════════════════════════════════════════════════
-
-const FB_ON = !!(FB_CFG.apiKey && FB_CFG.projectId);
-let auth = null, db = null, currentUser = null, syncSt = 'offline';
-
-if (FB_ON) {
-  firebase.initializeApp(FB_CFG);
-  auth = firebase.auth();
-  db   = firebase.firestore();
-  auth.onAuthStateChanged(u => {
-    currentUser = u;
-    renderUserArea();
-    if (u) loadCloud();
-    else setSyncSt('offline');
-  });
-}
+// Data is stored locally in the browser (localStorage). No cloud sync.
 
 // ── Grades ────────────────────────────────────────────────────────
 const GS = [
@@ -182,95 +141,7 @@ const gd = () => {
   catch { return mk(); }
 };
 
-const scheduleCloudSync = data => {
-  if (!db || !currentUser) return;
-  clearTimeout(syncTimer);
-  setSyncSt('ing');
-  syncTimer = setTimeout(() => syncToCloud(data), SYNC_DELAY);
-};
-
-const sd = (data, opts = {}) => {
-  const clean = persistLocal(data, {touch: opts.touch !== false});
-  if (opts.sync !== false) scheduleCloudSync(clean);
-  return clean;
-};
-
-// ── Cloud Sync ────────────────────────────────────────────────────
-function setSyncSt(state) {
-  syncSt = state;
-  const dot = document.getElementById('sync-dot');
-  if (dot) { dot.className = 'sync-dot' + (state==='online'?'':state==='ing'?' ing':' off'); }
-  const tbSync = document.getElementById('tb-sync');
-  if (tbSync) {
-    const col = state==='online'?'var(--ok)':state==='ing'?'var(--wn)':'var(--txd)';
-    const lbl = state==='online'?'Synced':state==='ing'?'Syncing…':'Offline';
-    tbSync.innerHTML = `<span style="font-size:10.5px;color:${col};font-weight:600">${lbl}</span>`;
-  }
-}
-
-async function syncToCloud(data) {
-  if (!db || !currentUser) return;
-  clearTimeout(syncTimer);
-  setSyncSt('ing');
-  try {
-    await db.collection('users').doc(currentUser.uid).collection('data').doc('main').set(normalizeData(data));
-    setSyncSt('online');
-  } catch(e) {
-    setSyncSt('offline');
-    toast('Cloud sync failed — data saved locally', 'warn');
-    console.warn('Sync failed:', e);
-  }
-}
-
-async function loadCloud() {
-  if (!db || !currentUser) return;
-  setSyncSt('ing');
-  try {
-    const snap = await db.collection('users').doc(currentUser.uid).collection('data').doc('main').get();
-    if (snap.exists) {
-      const local = gd();
-      const cloud = normalizeData(snap.data());
-      const localTime = Date.parse(local.updatedAt || 0);
-      const cloudTime = Date.parse(cloud.updatedAt || 0);
-      if (localTime > cloudTime && !confirm('Local data is newer than cloud data. Pull cloud copy anyway?')) {
-        await syncToCloud(local);
-      } else {
-        persistLocal(cloud, {touch:false});
-      }
-    } else {
-      await syncToCloud(gd());
-    }
-    setSyncSt('online');
-    renderDash();
-    if (document.getElementById('tab-settings').classList.contains('on')) {
-      loadProfile(); renderTmplSettings();
-    }
-  } catch(e) {
-    setSyncSt('offline');
-    toast('Failed to load cloud data — using local copy', 'warn');
-    console.warn('Load cloud failed:', e);
-  }
-}
-
-async function signInGoogle() {
-  if (!auth) return;
-  try {
-    const prov = new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(prov);
-    toast('Signed in!');
-  } catch(e) {
-    toast('Sign-in failed: ' + e.message, 'err');
-  }
-}
-
-async function signOutUser() {
-  if (!auth) return;
-  await auth.signOut();
-  currentUser = null;
-  setSyncSt('offline');
-  renderUserArea();
-  toast('Signed out');
-}
+const sd = (data, opts = {}) => persistLocal(data, {touch: opts.touch !== false});
 
 // ── User Area (sidebar + settings) ───────────────────────────────
 function renderUserArea() {
@@ -278,79 +149,20 @@ function renderUserArea() {
   const name = p.name || 'Student';
   const el = document.getElementById('sb-user-area');
   if (!el) return;
-
-  if (!FB_ON) {
-    el.innerHTML = `
-      <div class="sb-user-row">
-        <div class="avatar">${esc(name[0].toUpperCase())}</div>
-        <div><div class="user-name">${esc(name)}</div><div class="user-sub">Offline mode</div></div>
-        <div class="sync-dot off" id="sync-dot"></div>
-      </div>`;
-  } else if (!currentUser) {
-    el.innerHTML = `
-      <div style="text-align:center">
-        <div style="font-size:11px;color:var(--txm);margin-bottom:10px">Sign in to sync across devices</div>
-        <button class="btn bg-google bfw" onclick="signInGoogle()">
-          <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-          Sign in with Google
-        </button>
-      </div>`;
-  } else {
-    const u = currentUser;
-    const photoHtml = u.photoURL
-      ? `<img src="${esc(u.photoURL)}" alt="">`
-      : (u.displayName || u.email || 'S')[0].toUpperCase();
-    el.innerHTML = `
-      <div class="sb-user-row">
-        <div class="avatar">${photoHtml}</div>
-        <div style="flex:1;min-width:0">
-          <div class="user-name">${esc(u.displayName || u.email)}</div>
-          <div class="user-sub">${syncSt==='online'?'Synced':'Syncing…'}</div>
-        </div>
-        <div class="sync-dot ${syncSt==='online'?'':'ing'}" id="sync-dot"></div>
-      </div>
-      <div style="margin-top:10px">
-        <button class="btn bs bsm bfw" onclick="signOutUser()">Sign out</button>
-      </div>`;
-  }
-
+  el.innerHTML = `
+    <div class="sb-user-row">
+      <div class="avatar">${esc(name[0].toUpperCase())}</div>
+      <div><div class="user-name">${esc(name)}</div><div class="user-sub">Local storage</div></div>
+    </div>`;
   renderSyncCard();
 }
 
 function renderSyncCard() {
   const el = document.getElementById('sync-card');
   if (!el) return;
-
-  if (!FB_ON) {
-    el.innerHTML = `
-      <div class="ct">Cloud Sync — Not Configured</div>
-      <div class="al ai" style="margin-bottom:10px">ℹ Firebase is not configured. Your data is stored locally in this browser only.</div>
-      <p style="font-size:12.5px;color:var(--txm);line-height:1.7;margin-bottom:12px">
-        To enable cross-device sync:<br>
-        1. Create a free Firebase project at <strong>console.firebase.google.com</strong><br>
-        2. Enable Google Sign-in under Authentication<br>
-        3. Create a Firestore database<br>
-        4. Paste your <code style="background:var(--sur2);padding:1px 5px;border-radius:4px">firebaseConfig</code> into the <strong>FB_CFG</strong> object at the top of index.html
-      </p>`;
-  } else if (!currentUser) {
-    el.innerHTML = `
-      <div class="ct">Cloud Sync</div>
-      <div class="al aw" style="margin-bottom:12px">⚠ Not signed in — data is only saved locally.</div>
-      <button class="btn bg-google" onclick="signInGoogle()">
-        <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-        Sign in with Google
-      </button>`;
-  } else {
-    const u = currentUser;
-    el.innerHTML = `
-      <div class="ct">Cloud Sync</div>
-      <div class="al as" style="margin-bottom:12px">✓ Signed in as <strong>${esc(u.displayName || u.email)}</strong> — data syncs automatically.</div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn bs" onclick="loadCloud()">↓ Pull from Cloud</button>
-        <button class="btn bs" onclick="syncToCloud(gd())">↑ Push to Cloud</button>
-        <button class="btn bd" onclick="signOutUser()">Sign out</button>
-      </div>`;
-  }
+  el.innerHTML = `
+    <div class="ct">Data Storage</div>
+    <div class="al ai">ℹ Your data is saved locally in this browser. Use Export JSON to back it up.</div>`;
 }
 
 // ── Default Templates ─────────────────────────────────────────────
@@ -422,6 +234,107 @@ const cgpa = ss => { const n = ss.reduce((a,s) => a+s.tc, 0); return n>0 ? ss.re
 // ── Navigation ────────────────────────────────────────────────────
 const TAB_TITLES = {dashboard:'Dashboard', internals:'Internals Calc', semester:'Add Semester', predictor:'CGPA Predictor', settings:'Settings'};
 
+// ── PDF Export ────────────────────────────────────────────────────
+function exportPDF() {
+  const d = gd(), ss = d.semesters;
+  if (!ss.length) { toast('No semester data to export', 'warn'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const cg = cgpa(ss);
+  const tc = ss.reduce((a,s) => a+s.tc, 0);
+  const hasArr = ss.some(s => s.courses.some(c => c.pt === 0));
+  const cls = classify(cg, hasArr);
+  const p = d.profile;
+  const W = 210, M = 15;
+
+  // Header
+  doc.setFillColor(99, 102, 241);
+  doc.rect(0, 0, W, 32, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('SASTRA Academic Transcript', M, 13);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})}`, M, 22);
+  doc.text('SASTRA Deemed University', W - M, 22, { align: 'right' });
+
+  // Profile block
+  let y = 42;
+  doc.setTextColor(30, 30, 30);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(p.name || 'Student', M, y); y += 7;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  if (p.branch) { doc.text(p.branch, M, y); y += 5; }
+  if (p.batch)  { doc.text(`Batch: ${p.batch}`, M, y); y += 5; }
+  doc.text(`Programme: ${p.programme === 'mtech' ? 'Integrated M.Tech' : 'B.Tech'} · Credits Earned: ${tc}`, M, y); y += 10;
+
+  // Summary box
+  doc.setFillColor(240, 240, 255);
+  doc.roundedRect(M, y, W - 2*M, 18, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(99, 102, 241);
+  doc.text(`CGPA: ${cg.toFixed(2)}`, M + 6, y + 7);
+  doc.setTextColor(30, 30, 30);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Classification: ${cls.l}`, M + 6, y + 13);
+  doc.text(`Arrears: ${hasArr ? 'Yes' : 'None'}`, W - M - 30, y + 7);
+  y += 24;
+
+  // Semester breakdown
+  ss.forEach((sem, si) => {
+    if (y > 255) { doc.addPage(); y = 15; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    doc.text(`${sem.name}  —  SGPA: ${sem.sgpa.toFixed(2)}  ·  Credits: ${sem.tc}`, M, y); y += 6;
+    // Column headers
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Course', M, y);
+    doc.text('Cr', M + 90, y, { align: 'right' });
+    doc.text('Grade', M + 110, y, { align: 'right' });
+    doc.text('Pts', M + 125, y, { align: 'right' });
+    doc.text('Marks', M + 145, y, { align: 'right' });
+    y += 2;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(M, y, W - M, y); y += 4;
+    // Rows
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 30, 30);
+    sem.courses.forEach(c => {
+      if (y > 270) { doc.addPage(); y = 15; }
+      const name = c.name.length > 52 ? c.name.slice(0, 49) + '…' : c.name;
+      doc.text(name, M, y);
+      doc.text(String(c.credits), M + 90, y, { align: 'right' });
+      doc.text(c.grade, M + 110, y, { align: 'right' });
+      doc.text(String(c.pt), M + 125, y, { align: 'right' });
+      doc.text(c.marks != null ? `${c.marks}/100` : '—', M + 145, y, { align: 'right' });
+      y += 5;
+    });
+    y += 4;
+  });
+
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Page ${i} of ${pageCount} · SASTRA Academic Tracker`, W / 2, 290, { align: 'center' });
+  }
+
+  const filename = `${(p.name || 'transcript').replace(/\s+/g,'-').toLowerCase()}-transcript.pdf`;
+  doc.save(filename);
+  toast('PDF exported!');
+}
+
 function goTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
   document.getElementById('tab-' + name).classList.add('on');
@@ -437,7 +350,7 @@ function goTab(name) {
 // ════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ════════════════════════════════════════════════════════════════════
-let gChart = null;
+let gChart = null, pieChart = null;
 
 function renderDash() {
   const d = gd(), ss = d.semesters;
@@ -499,9 +412,40 @@ function renderDash() {
       </div>
     </div>
 
+    <div class="g2" style="margin-bottom:14px">
+      <div class="card" style="margin-bottom:0">
+        <div class="ct">GPA Trend</div>
+        <canvas id="gc" height="160"></canvas>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="ct">Grade Distribution</div>
+        <canvas id="pc" height="160"></canvas>
+      </div>
+    </div>
+
     <div class="card">
-      <div class="ct">GPA Trend</div>
-      <canvas id="gc" height="88"></canvas>
+      <div class="ct">Performance Heatmap <span style="font-size:11px;font-weight:400;color:var(--txm)">— grade points by course × semester</span></div>
+      <div style="overflow-x:auto">
+        <table id="heatmap-tbl" style="width:auto;min-width:100%;table-layout:auto;border-collapse:separate;border-spacing:3px">
+          <thead><tr><th style="text-align:left;white-space:nowrap;padding:4px 8px">Course / Sem</th>
+            ${ss.map(s => `<th style="white-space:nowrap;padding:4px 8px;font-size:11px">${esc(s.name)}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${(()=>{
+              const allNames = [...new Set(ss.flatMap(s => s.courses.map(c => c.name)))].sort();
+              return allNames.map(name => {
+                const cells = ss.map(s => {
+                  const c = s.courses.find(x => x.name === name);
+                  if (!c) return `<td style="padding:4px 8px;border-radius:4px;background:rgba(255,255,255,.04);color:var(--txm);font-size:12px;text-align:center">—</td>`;
+                  const g = gfp(c.pt);
+                  return `<td style="padding:4px 8px;border-radius:4px;background:${g.c}22;color:${g.c};font-weight:700;font-size:12px;text-align:center" title="${esc(c.name)}: ${c.grade} (${c.pt} pts)">${c.grade}</td>`;
+                }).join('');
+                return `<tr><td style="white-space:nowrap;padding:4px 8px;font-size:12px;font-weight:500">${esc(name)}</td>${cells}</tr>`;
+              }).join('');
+            })()}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
@@ -553,7 +497,9 @@ function renderDash() {
         : `<div class="al aw">⚠ CGPA is ${cg.toFixed(2)} — use the <strong>CGPA Predictor</strong> to plan your improvement path.</div>`}
   `;
 
-  if (gChart) { gChart.destroy(); gChart = null; }
+  if (gChart)  { gChart.destroy();  gChart  = null; }
+  if (pieChart){ pieChart.destroy(); pieChart = null; }
+
   const ctx = document.getElementById('gc');
   if (ctx) {
     gChart = new Chart(ctx, {
@@ -572,6 +518,35 @@ function renderDash() {
           x: {grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#64748b', font:{family:'Inter',size:11}}}
         },
         plugins: { legend:{labels:{color:'#94a3b8', font:{family:'Inter',size:12}, boxWidth:12}} }
+      }
+    });
+  }
+
+  // Grade distribution pie
+  const pCtx = document.getElementById('pc');
+  if (pCtx) {
+    const allCourses = ss.flatMap(s => s.courses);
+    const gradeCounts = GS.map(g => ({ grade: g.g, color: g.c, count: allCourses.filter(c => c.grade === g.g).length }))
+                          .filter(x => x.count > 0);
+    pieChart = new Chart(pCtx, {
+      type: 'doughnut',
+      data: {
+        labels: gradeCounts.map(x => `${x.grade} (${x.count})`),
+        datasets: [{
+          data: gradeCounts.map(x => x.count),
+          backgroundColor: gradeCounts.map(x => x.color + 'cc'),
+          borderColor: gradeCounts.map(x => x.color),
+          borderWidth: 2,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 }, boxWidth: 12, padding: 10 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label} — ${ctx.raw} course${ctx.raw!==1?'s':''}` } }
+        },
+        cutout: '62%'
       }
     });
   }
